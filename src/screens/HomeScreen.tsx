@@ -11,7 +11,6 @@ import {
 import ScreenBackground from '../components/layout/ScreenBackground';
 import AppHeader from '../components/layout/AppHeader';
 import MenuModal from '../components/layout/MenuModal';
-import HeroNoticeCard from '../components/notice/HeroNoticeCard';
 import NoticeSection from '../components/notice/NoticeSection';
 import { ScrollRefProvider } from '../contexts/ScrollRefContext';
 
@@ -31,8 +30,7 @@ export default function HomeScreen() {
     });
 
     const [menuOpen, setMenuOpen] = useState(false);
-    const heroNotice = today[0];
-    const restToday = today.slice(1);
+    const restToday = today;
 
     // SwipeableNoticeRow가 스와이프 시 ScrollView 스크롤을 잠근다
     const scrollRef = useRef<ScrollView>(null);
@@ -69,8 +67,6 @@ export default function HomeScreen() {
                             </View>
                         ) : (
                             <>
-                                {heroNotice && <HeroNoticeCard notice={heroNotice} />}
-
                                 <NoticeSection
                                     title="내 키워드 공지"
                                     subtitle={
