@@ -14,7 +14,7 @@ export const mockNotices: Notice[] = [
         publishedAt: '2026-05-06T09:10:00+09:00',
         sourceUrl: 'https://www.uos.ac.kr/notice/2026-0512',
         viewCount: 18420,
-        isPinned: true,
+        isSourcePinned: true,
     },
     {
         id: 'uos-2026-0508',

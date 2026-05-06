@@ -16,7 +16,7 @@ export const uosAdapter: UniversityAdapter = {
         return mockNotices
             .filter(n => n.universityId === 'uos')
             .sort((a, b) =>
-                Number(!!b.isPinned) - Number(!!a.isPinned) ||
+                Number(!!b.isSourcePinned) - Number(!!a.isSourcePinned) ||
                 +new Date(b.publishedAt) - +new Date(a.publishedAt),
             );
     },
