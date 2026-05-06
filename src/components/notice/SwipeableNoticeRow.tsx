@@ -11,11 +11,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { radius, spacing } from '../../constants/theme';
 import { haptics } from '../../utils/haptics';
+import { useScrollRef } from '../../contexts/ScrollRefContext';
 
 interface Props {
     children: React.ReactNode;
     onDelete: () => void;
-    /** 다른 행을 열 때 이 행을 닫기 위한 외부 신호 */
     activeRowId?: string | null;
     rowId: string;
     onActivate: (id: string) => void;
@@ -24,20 +24,15 @@ interface Props {
 /**
  * 고급 스와이프-삭제 행.
  *
- * 인터랙션:
- *  1) 좌로 드래그 → 우측에서 휴지통이 비례해서 따라 나옴(parallax + scale).
- *  2) 임계치 진입 시 햅틱(warn) 한 번.
- *  3) 임계치 미만 release → spring으로 닫힘.
- *  4) 임계치 이상 release → snap-open (휴지통 노출 상태 유지).
- *  5) 큰 폭으로 끌고 release → 즉시 commitDelete.
- *  6) 휴지통 탭 → slide-out + height collapse → onDelete().
- *  7) 다른 행이 열리면 자동으로 닫힘(activeRowId 동기화).
+ * 핵심 해결:
+ *  - ScrollView.setNativeProps({ scrollEnabled: false/true })로
+ *    수직 스크롤 제스처와의 충돌 차단.
+ *  - 가로 의도(dx/dy 비율)가 명확할 때만 제스처를 가로챔.
  */
 
 const ACTION_WIDTH = 88;
 const OPEN_X = -ACTION_WIDTH;
-const PEEK_THRESHOLD = -28;
-const HAPTIC_THRESHOLD = -ACTION_WIDTH * 0.7;
+const HAPTIC_THRESHOLD = -ACTION_WIDTH * 0.65;
 const COMMIT_THRESHOLD = -180;
 
 export default function SwipeableNoticeRow({
@@ -47,10 +42,10 @@ export default function SwipeableNoticeRow({
     rowId,
     onActivate,
 }: Props) {
+    const scrollRef = useScrollRef();
     const translateX = useRef(new Animated.Value(0)).current;
     const opacity = useRef(new Animated.Value(1)).current;
 
-    // 삭제 시퀀스에서만 사용. 평소 wrapper의 height는 'auto'.
     const [collapseHeight, setCollapseHeight] = useState<number | null>(null);
     const collapseAnim = useRef(new Animated.Value(1)).current;
     const measuredHeight = useRef(0);
@@ -58,6 +53,7 @@ export default function SwipeableNoticeRow({
     const isOpen = useRef(false);
     const hapticArmed = useRef(true);
 
+    // 다른 행이 열리면 닫힘
     useEffect(() => {
         if (activeRowId && activeRowId !== rowId && isOpen.current) {
             close();
@@ -65,8 +61,15 @@ export default function SwipeableNoticeRow({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeRowId, rowId]);
 
+    const enableScroll = () =>
+        scrollRef?.current?.setNativeProps({ scrollEnabled: true });
+
+    const disableScroll = () =>
+        scrollRef?.current?.setNativeProps({ scrollEnabled: false });
+
     const close = () => {
         isOpen.current = false;
+        enableScroll();
         Animated.spring(translateX, {
             toValue: 0,
             useNativeDriver: true,
@@ -88,7 +91,7 @@ export default function SwipeableNoticeRow({
 
     const commitDelete = () => {
         haptics.confirm();
-        // 1단계: 좌로 슬라이드 + 페이드
+        enableScroll();
         Animated.parallel([
             Animated.timing(translateX, {
                 toValue: -600,
@@ -98,11 +101,10 @@ export default function SwipeableNoticeRow({
             }),
             Animated.timing(opacity, {
                 toValue: 0,
-                duration: 220,
+                duration: 200,
                 useNativeDriver: true,
             }),
         ]).start(() => {
-            // 2단계: 측정된 높이를 잠가둔 뒤 0으로 줄여 리스트가 닫히게 함
             if (measuredHeight.current > 0) {
                 setCollapseHeight(measuredHeight.current);
                 collapseAnim.setValue(1);
@@ -121,22 +123,29 @@ export default function SwipeableNoticeRow({
     const panResponder = useMemo(
         () =>
             PanResponder.create({
+                // 탭은 Pressable에 넘기고 이동에서만 제스처 경쟁
+                onStartShouldSetPanResponder: () => false,
+                onStartShouldSetPanResponderCapture: () => false,
+
+                // 가로 의도가 명확하면(dx > dy × 1.5) 즉시 가로채기
                 onMoveShouldSetPanResponder: (_, g) =>
-                    Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+                    Math.abs(g.dx) > 4 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+
                 onPanResponderGrant: () => {
                     hapticArmed.current = true;
+                    // ScrollView 스크롤 즉시 차단 → 카드가 부드럽게 따라옴
+                    disableScroll();
                     onActivate(rowId);
                 },
+
                 onPanResponderMove: (_, g) => {
                     const base = isOpen.current ? OPEN_X : 0;
                     let next = base + g.dx;
 
-                    // 우측 고무줄 (당겨도 잘 안 늘어남)
-                    if (next > 0) next = next * 0.25;
-                    // 좌측 과도한 드래그도 고무줄
-                    if (next < -ACTION_WIDTH * 1.6) {
-                        const overflow = next + ACTION_WIDTH * 1.6;
-                        next = -ACTION_WIDTH * 1.6 + overflow * 0.35;
+                    if (next > 0) next = next * 0.2;
+                    if (next < -ACTION_WIDTH * 1.7) {
+                        const overflow = next + ACTION_WIDTH * 1.7;
+                        next = -ACTION_WIDTH * 1.7 + overflow * 0.3;
                     }
                     translateX.setValue(next);
 
@@ -147,37 +156,43 @@ export default function SwipeableNoticeRow({
                         hapticArmed.current = true;
                     }
                 },
+
                 onPanResponderRelease: (_, g) => {
                     const base = isOpen.current ? OPEN_X : 0;
                     const finalX = base + g.dx;
 
                     if (finalX < COMMIT_THRESHOLD) {
                         commitDelete();
-                    } else if (finalX < PEEK_THRESHOLD) {
+                    } else if (finalX < OPEN_X / 2) {
+                        // OPEN_X의 절반(-44) 이상 밀면 snap-open
                         openSnap();
                     } else {
                         close();
                     }
                 },
+
                 onPanResponderTerminate: () => close(),
+
+                onShouldBlockNativeResponder: () => true,
             }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [rowId],
     );
 
-    const trashTranslate = translateX.interpolate({
-        inputRange: [OPEN_X, 0],
-        outputRange: [0, ACTION_WIDTH * 0.4],
+    // 휴지통 등장 애니메이션
+    const trashOpacity = translateX.interpolate({
+        inputRange: [OPEN_X, OPEN_X * 0.4, 0],
+        outputRange: [1, 0.7, 0],
         extrapolate: 'clamp',
     });
-    const trashOpacity = translateX.interpolate({
-        inputRange: [OPEN_X, OPEN_X / 2, 0],
-        outputRange: [1, 0.6, 0],
+    const trashTranslateX = translateX.interpolate({
+        inputRange: [OPEN_X, 0],
+        outputRange: [0, ACTION_WIDTH * 0.45],
         extrapolate: 'clamp',
     });
     const trashScale = translateX.interpolate({
-        inputRange: [OPEN_X * 1.2, OPEN_X, 0],
-        outputRange: [1.06, 1, 0.85],
+        inputRange: [OPEN_X * 1.15, OPEN_X, OPEN_X * 0.5, 0],
+        outputRange: [1.08, 1, 0.92, 0.8],
         extrapolate: 'clamp',
     });
 
@@ -192,19 +207,20 @@ export default function SwipeableNoticeRow({
                       inputRange: [0, 1],
                       outputRange: [0, spacing.md],
                   }),
+                  overflow: 'hidden' as const,
                   opacity,
               }
             : { opacity };
 
     return (
         <Animated.View style={[styles.wrapper, wrapperStyle]}>
-            {/* 우측 액션 — 카드가 밀리면 드러남 */}
+            {/* 우측 휴지통 — 카드가 밀리면 드러남 */}
             <Animated.View
                 style={[
                     styles.action,
                     {
                         opacity: trashOpacity,
-                        transform: [{ translateX: trashTranslate }],
+                        transform: [{ translateX: trashTranslateX }],
                     },
                 ]}
                 pointerEvents="box-none"
@@ -215,7 +231,7 @@ export default function SwipeableNoticeRow({
                         styles.trashButton,
                         pressed && styles.trashPressed,
                     ]}
-                    hitSlop={6}
+                    hitSlop={8}
                 >
                     <LinearGradient
                         colors={['#FF6A5A', '#E03A2C']}
@@ -254,11 +270,10 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     action: {
-        position: 'absolute',
-        top: 0, bottom: 0, right: 0,
-        width: ACTION_WIDTH,
+        ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
-        alignItems: 'center',
+        alignItems: 'flex-end',
+        paddingRight: 4,
     },
     trashButton: {
         width: ACTION_WIDTH - spacing.sm,
@@ -269,11 +284,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         shadowColor: '#FF3B30',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.4,
         shadowRadius: 12,
         elevation: 6,
     },
-    trashPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
+    trashPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
     trashInner: { alignItems: 'center', justifyContent: 'center' },
     trashLabel: {
         color: '#fff',
