@@ -135,6 +135,9 @@ export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>)
                 <AppHeader
                     universityName={adapter.name}
                     onMenuPress={() => menuRef.current?.snapToIndex(0)}
+                    onBannerItemPress={sectionId =>
+                        navigation.navigate('SectionDetail', { sectionId })
+                    }
                 />
 
                 {jiggleMode && (

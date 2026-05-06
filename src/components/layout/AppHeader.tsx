@@ -2,15 +2,22 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import RollingBanner from './RollingBanner';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { haptics } from '../../utils/haptics';
 
 interface Props {
     universityName: string;
     onMenuPress: () => void;
+    /** 롤링 배너 항목 탭 → 해당 섹션 진입 */
+    onBannerItemPress: (sectionId: string) => void;
 }
 
-export default function AppHeader({ universityName, onMenuPress }: Props) {
+export default function AppHeader({
+    universityName,
+    onMenuPress,
+    onBannerItemPress,
+}: Props) {
     const handleMenu = () => {
         haptics.tap();
         onMenuPress();
@@ -19,7 +26,7 @@ export default function AppHeader({ universityName, onMenuPress }: Props) {
     return (
         <View style={styles.container}>
             <View style={styles.brandBlock}>
-                <Text style={styles.eyebrow}>UNIVERSITY · NOTIFY</Text>
+                <RollingBanner onItemPress={onBannerItemPress} />
                 <Text style={styles.school}>{universityName}</Text>
             </View>
 
@@ -44,21 +51,18 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.lg,
     },
     brandBlock: { flex: 1 },
-    eyebrow: {
-        ...typography.label,
-        color: colors.textTertiary,
-        marginBottom: 4,
-    },
     school: {
         ...typography.title,
         color: colors.textPrimary,
         fontSize: 18,
     },
     iconButton: {
-        width: 44, height: 44,
+        width: 44,
+        height: 44,
         borderRadius: radius.md,
         overflow: 'hidden',
-        alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: 'rgba(255,255,255,0.06)',
     },
