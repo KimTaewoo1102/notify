@@ -1,40 +1,41 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-    Animated,
-    Easing,
-    PanResponder,
-    Pressable,
-    StyleSheet,
-    Text,
-} from 'react-native';
+import React, { useCallback } from 'react';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+    Extrapolation,
+    interpolate,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
+    Easing,
+} from 'react-native-reanimated';
 import { radius, spacing } from '../../constants/theme';
 import { haptics } from '../../utils/haptics';
-import { useScrollRef } from '../../contexts/ScrollRefContext';
 
 interface Props {
     children: React.ReactNode;
     onDelete: () => void;
     activeRowId?: string | null;
     rowId: string;
-    onActivate: (id: string) => void;
+    onActivate: (id: string | null) => void;
 }
-
-/**
- * 고급 스와이프-삭제 행.
- *
- * 핵심 해결:
- *  - ScrollView.setNativeProps({ scrollEnabled: false/true })로
- *    수직 스크롤 제스처와의 충돌 차단.
- *  - 가로 의도(dx/dy 비율)가 명확할 때만 제스처를 가로챔.
- */
 
 const ACTION_WIDTH = 88;
 const OPEN_X = -ACTION_WIDTH;
 const HAPTIC_THRESHOLD = -ACTION_WIDTH * 0.65;
 const COMMIT_THRESHOLD = -180;
 
+const SPRING = { damping: 18, stiffness: 240, mass: 0.8 };
+
+/**
+ * Reanimated v3 + Gesture Handler 기반 고성능 스와이프 행.
+ * - 모든 애니메이션이 UI thread 에서 동작 (120fps).
+ * - 가로 의도가 명확할 때만 활성화 (수직 스크롤과 충돌 방지).
+ */
 export default function SwipeableNoticeRow({
     children,
     onDelete,
@@ -42,191 +43,126 @@ export default function SwipeableNoticeRow({
     rowId,
     onActivate,
 }: Props) {
-    const scrollRef = useScrollRef();
-    const translateX = useRef(new Animated.Value(0)).current;
-    const opacity = useRef(new Animated.Value(1)).current;
+    const translateX = useSharedValue(0);
+    const itemOpacity = useSharedValue(1);
+    const itemHeight = useSharedValue(1);
+    const hapticArmed = useSharedValue(true);
+    const isOpen = useSharedValue(false);
 
-    const [collapseHeight, setCollapseHeight] = useState<number | null>(null);
-    const collapseAnim = useRef(new Animated.Value(1)).current;
-    const measuredHeight = useRef(0);
-
-    const isOpen = useRef(false);
-    const hapticArmed = useRef(true);
-
-    // 다른 행이 열리면 닫힘
-    useEffect(() => {
-        if (activeRowId && activeRowId !== rowId && isOpen.current) {
-            close();
+    // 다른 행이 열리면 자동 닫힘
+    React.useEffect(() => {
+        if (activeRowId && activeRowId !== rowId && isOpen.value) {
+            translateX.value = withSpring(0, SPRING);
+            isOpen.value = false;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeRowId, rowId]);
+    }, [activeRowId, rowId, isOpen, translateX]);
 
-    const enableScroll = () =>
-        scrollRef?.current?.setNativeProps({ scrollEnabled: true });
+    const triggerHaptic = useCallback((kind: 'warn' | 'confirm') => {
+        if (kind === 'warn') haptics.warn();
+        else haptics.confirm();
+    }, []);
 
-    const disableScroll = () =>
-        scrollRef?.current?.setNativeProps({ scrollEnabled: false });
-
-    const close = () => {
-        isOpen.current = false;
-        enableScroll();
-        Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 9,
-            tension: 80,
-        }).start();
-    };
-
-    const openSnap = () => {
-        isOpen.current = true;
-        onActivate(rowId);
-        Animated.spring(translateX, {
-            toValue: OPEN_X,
-            useNativeDriver: true,
-            friction: 9,
-            tension: 90,
-        }).start();
-    };
-
-    const commitDelete = () => {
-        haptics.confirm();
-        enableScroll();
-        Animated.parallel([
-            Animated.timing(translateX, {
-                toValue: -600,
-                duration: 220,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            if (measuredHeight.current > 0) {
-                setCollapseHeight(measuredHeight.current);
-                collapseAnim.setValue(1);
-                Animated.timing(collapseAnim, {
-                    toValue: 0,
-                    duration: 200,
-                    easing: Easing.inOut(Easing.cubic),
-                    useNativeDriver: false,
-                }).start(() => onDelete());
-            } else {
-                onDelete();
-            }
-        });
-    };
-
-    const panResponder = useMemo(
-        () =>
-            PanResponder.create({
-                // 탭은 Pressable에 넘기고 이동에서만 제스처 경쟁
-                onStartShouldSetPanResponder: () => false,
-                onStartShouldSetPanResponderCapture: () => false,
-
-                // 가로 의도가 명확하면(dx > dy × 1.5) 즉시 가로채기
-                onMoveShouldSetPanResponder: (_, g) =>
-                    Math.abs(g.dx) > 4 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-
-                onPanResponderGrant: () => {
-                    hapticArmed.current = true;
-                    // ScrollView 스크롤 즉시 차단 → 카드가 부드럽게 따라옴
-                    disableScroll();
-                    onActivate(rowId);
-                },
-
-                onPanResponderMove: (_, g) => {
-                    const base = isOpen.current ? OPEN_X : 0;
-                    let next = base + g.dx;
-
-                    if (next > 0) next = next * 0.2;
-                    if (next < -ACTION_WIDTH * 1.7) {
-                        const overflow = next + ACTION_WIDTH * 1.7;
-                        next = -ACTION_WIDTH * 1.7 + overflow * 0.3;
-                    }
-                    translateX.setValue(next);
-
-                    if (hapticArmed.current && next < HAPTIC_THRESHOLD) {
-                        haptics.warn();
-                        hapticArmed.current = false;
-                    } else if (!hapticArmed.current && next > HAPTIC_THRESHOLD) {
-                        hapticArmed.current = true;
-                    }
-                },
-
-                onPanResponderRelease: (_, g) => {
-                    const base = isOpen.current ? OPEN_X : 0;
-                    const finalX = base + g.dx;
-
-                    if (finalX < COMMIT_THRESHOLD) {
-                        commitDelete();
-                    } else if (finalX < OPEN_X / 2) {
-                        // OPEN_X의 절반(-44) 이상 밀면 snap-open
-                        openSnap();
-                    } else {
-                        close();
-                    }
-                },
-
-                onPanResponderTerminate: () => close(),
-
-                onShouldBlockNativeResponder: () => true,
-            }),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [rowId],
+    const triggerActivate = useCallback(
+        (id: string | null) => onActivate(id),
+        [onActivate],
     );
 
-    // 휴지통 등장 애니메이션
-    const trashOpacity = translateX.interpolate({
-        inputRange: [OPEN_X, OPEN_X * 0.4, 0],
-        outputRange: [1, 0.7, 0],
-        extrapolate: 'clamp',
-    });
-    const trashTranslateX = translateX.interpolate({
-        inputRange: [OPEN_X, 0],
-        outputRange: [0, ACTION_WIDTH * 0.45],
-        extrapolate: 'clamp',
-    });
-    const trashScale = translateX.interpolate({
-        inputRange: [OPEN_X * 1.15, OPEN_X, OPEN_X * 0.5, 0],
-        outputRange: [1.08, 1, 0.92, 0.8],
-        extrapolate: 'clamp',
-    });
+    const triggerDelete = useCallback(() => onDelete(), [onDelete]);
 
-    const wrapperStyle =
-        collapseHeight != null
-            ? {
-                  height: collapseAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, collapseHeight],
-                  }),
-                  marginBottom: collapseAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, spacing.md],
-                  }),
-                  overflow: 'hidden' as const,
-                  opacity,
-              }
-            : { opacity };
+    const pan = Gesture.Pan()
+        .activeOffsetX([-8, 8])
+        .failOffsetY([-12, 12])
+        .onBegin(() => {
+            hapticArmed.value = true;
+            runOnJS(triggerActivate)(rowId);
+        })
+        .onUpdate(e => {
+            const base = isOpen.value ? OPEN_X : 0;
+            let next = base + e.translationX;
+            if (next > 0) next = next * 0.2;
+            if (next < -ACTION_WIDTH * 1.7) {
+                const overflow = next + ACTION_WIDTH * 1.7;
+                next = -ACTION_WIDTH * 1.7 + overflow * 0.3;
+            }
+            translateX.value = next;
+
+            if (hapticArmed.value && next < HAPTIC_THRESHOLD) {
+                hapticArmed.value = false;
+                runOnJS(triggerHaptic)('warn');
+            } else if (!hapticArmed.value && next > HAPTIC_THRESHOLD) {
+                hapticArmed.value = true;
+            }
+        })
+        .onEnd(e => {
+            const base = isOpen.value ? OPEN_X : 0;
+            const final = base + e.translationX;
+
+            if (final < COMMIT_THRESHOLD) {
+                runOnJS(triggerHaptic)('confirm');
+                translateX.value = withTiming(-600, {
+                    duration: 220,
+                    easing: Easing.out(Easing.cubic),
+                });
+                itemOpacity.value = withTiming(0, { duration: 200 });
+                itemHeight.value = withTiming(
+                    0,
+                    { duration: 220, easing: Easing.inOut(Easing.cubic) },
+                    finished => {
+                        if (finished) runOnJS(triggerDelete)();
+                    },
+                );
+            } else if (final < OPEN_X / 2) {
+                isOpen.value = true;
+                translateX.value = withSpring(OPEN_X, SPRING);
+            } else {
+                isOpen.value = false;
+                translateX.value = withSpring(0, SPRING);
+            }
+        });
+
+    const cardStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }],
+    }));
+
+    const wrapperStyle = useAnimatedStyle(() => ({
+        opacity: itemOpacity.value,
+        transform: [{ scaleY: itemHeight.value }],
+        // collapse via maxHeight surrogate: vertical scale collapses height visually
+    }));
+
+    const trashStyle = useAnimatedStyle(() => {
+        const opacity = interpolate(
+            translateX.value,
+            [OPEN_X, OPEN_X * 0.4, 0],
+            [1, 0.7, 0],
+            Extrapolation.CLAMP,
+        );
+        const tx = interpolate(
+            translateX.value,
+            [OPEN_X, 0],
+            [0, ACTION_WIDTH * 0.45],
+            Extrapolation.CLAMP,
+        );
+        const scale = interpolate(
+            translateX.value,
+            [OPEN_X * 1.15, OPEN_X, OPEN_X * 0.5, 0],
+            [1.08, 1, 0.92, 0.8],
+            Extrapolation.CLAMP,
+        );
+        return {
+            opacity,
+            transform: [{ translateX: tx }, { scale }],
+        };
+    });
 
     return (
         <Animated.View style={[styles.wrapper, wrapperStyle]}>
-            {/* 우측 휴지통 — 카드가 밀리면 드러남 */}
-            <Animated.View
-                style={[
-                    styles.action,
-                    {
-                        opacity: trashOpacity,
-                        transform: [{ translateX: trashTranslateX }],
-                    },
-                ]}
-                pointerEvents="box-none"
-            >
+            <Animated.View style={[styles.action, trashStyle]} pointerEvents="box-none">
                 <Pressable
-                    onPress={commitDelete}
+                    onPress={() => {
+                        haptics.confirm();
+                        onDelete();
+                    }}
                     style={({ pressed }) => [
                         styles.trashButton,
                         pressed && styles.trashPressed,
@@ -239,27 +175,16 @@ export default function SwipeableNoticeRow({
                         end={{ x: 1, y: 1 }}
                         style={StyleSheet.absoluteFillObject}
                     />
-                    <Animated.View
-                        style={[styles.trashInner, { transform: [{ scale: trashScale }] }]}
-                    >
+                    <Animated.View style={styles.trashInner}>
                         <Ionicons name="trash-outline" size={22} color="#fff" />
                         <Text style={styles.trashLabel}>삭제</Text>
                     </Animated.View>
                 </Pressable>
             </Animated.View>
 
-            {/* 카드 본체 */}
-            <Animated.View
-                {...panResponder.panHandlers}
-                onLayout={e => {
-                    if (!measuredHeight.current) {
-                        measuredHeight.current = e.nativeEvent.layout.height;
-                    }
-                }}
-                style={{ transform: [{ translateX }] }}
-            >
-                {children}
-            </Animated.View>
+            <GestureDetector gesture={pan}>
+                <Animated.View style={cardStyle}>{children}</Animated.View>
+            </GestureDetector>
         </Animated.View>
     );
 }

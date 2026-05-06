@@ -1,9 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-    Animated,
-    BackHandler,
-    Dimensions,
-    Easing,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -13,89 +9,93 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 
 import ScreenBackground from '../components/layout/ScreenBackground';
 import NoticeListItem from '../components/notice/NoticeListItem';
 import SwipeableNoticeRow from '../components/notice/SwipeableNoticeRow';
 import { ScrollRefProvider } from '../contexts/ScrollRefContext';
+import { useNotices } from '../hooks/useNotices';
+import { useSectionsStore } from '../store/sectionsStore';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { haptics } from '../utils/haptics';
+import type { RootStackScreenProps } from '../navigation/types';
 import type { Notice } from '../types/notice';
 
-interface Props {
-    title: string;
-    subtitle?: string;
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    notices: Notice[];
-    showViews?: boolean;
-    onDismiss: (id: string) => void;
-    onClose: () => void;
-}
-
-/**
- * 우측에서 슬라이드 인 되는 섹션 디테일.
- * - 자체 ScrollView + 자체 ScrollRefProvider 보유 (스와이프 잠금이 디테일 스크롤에만 적용)
- * - Android 하드웨어 백 버튼으로도 닫힘
- */
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
 export default function SectionDetailScreen({
-    title,
-    subtitle,
-    icon,
-    notices,
-    showViews,
-    onDismiss,
-    onClose,
-}: Props) {
-    const translateX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
-    const scrollRef = useRef<ScrollView>(null);
-    const [activeRowId, setActiveRowId] = useState<string | null>(null);
+    route,
+    navigation,
+}: RootStackScreenProps<'SectionDetail'>) {
+    const { sectionId } = route.params;
 
-    // 슬라이드 인
-    useEffect(() => {
-        Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 13,
-            tension: 75,
-        }).start();
-    }, [translateX]);
+    const section = useSectionsStore(s =>
+        s.sections.find(x => x.id === sectionId),
+    );
+    const keywords = useSectionsStore(s => s.keywords);
+    const toggleAlarm = useSectionsStore(s => s.toggleAlarm);
+    const togglePin = useSectionsStore(s => s.togglePin);
+
+    const { today, keyword, hot, dismiss } = useNotices({
+        universityId: 'uos',
+        keywords,
+    });
+
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
+    const scrollRef = useRef<ScrollView>(null);
+
+    const list = useMemo<Notice[]>(() => {
+        if (!section) return [];
+        switch (section.feed) {
+            case 'today':
+                return today;
+            case 'hot':
+                return hot;
+            case 'keyword':
+                return keyword;
+            default:
+                return [];
+        }
+    }, [section, today, hot, keyword]);
+
+    const subtitle = useMemo(() => {
+        if (!section) return '';
+        if (section.feed === 'keyword') {
+            return keywords.length === 0
+                ? '키워드를 등록하면 맞춤 공지가 나타나요'
+                : `"${keywords.join('", "')}" · ${list.length}건`;
+        }
+        return section.feed === 'hot'
+            ? `조회수 급상승 · ${list.length}건`
+            : `오늘 들어온 공지 · ${list.length}건`;
+    }, [section, keywords, list.length]);
+
+    if (!section) {
+        return (
+            <View style={styles.root}>
+                <ScreenBackground />
+                <SafeAreaView style={styles.safe}>
+                    <Text style={styles.notFound}>섹션을 찾을 수 없어요.</Text>
+                </SafeAreaView>
+            </View>
+        );
+    }
 
     const handleClose = () => {
         haptics.tap();
-        Animated.timing(translateX, {
-            toValue: SCREEN_WIDTH,
-            duration: 240,
-            easing: Easing.in(Easing.cubic),
-            useNativeDriver: true,
-        }).start(() => onClose());
+        navigation.goBack();
     };
 
-    // Android 하드웨어 백
-    useEffect(() => {
-        const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-            handleClose();
-            return true;
-        });
-        return () => sub.remove();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     return (
-        <Animated.View
-            style={[styles.overlay, { transform: [{ translateX }] }]}
-        >
+        <View style={styles.root}>
             <ScreenBackground />
 
             <SafeAreaView style={styles.safe}>
-                {/* 디테일 헤더: 백 + 타이틀 + 카운트 */}
                 <View style={styles.header}>
                     <Pressable
                         onPress={handleClose}
                         style={({ pressed }) => [
-                            styles.backButton,
-                            pressed && styles.backButtonPressed,
+                            styles.iconButton,
+                            pressed && styles.iconPressed,
                         ]}
                         hitSlop={10}
                     >
@@ -104,7 +104,7 @@ export default function SectionDetailScreen({
                             tint="dark"
                             style={StyleSheet.absoluteFillObject}
                         />
-                        <View style={styles.backFill} />
+                        <View style={styles.iconFill} />
                         <Ionicons
                             name="chevron-back"
                             size={22}
@@ -115,22 +115,70 @@ export default function SectionDetailScreen({
                     <View style={styles.titleBlock}>
                         <View style={styles.titleRow}>
                             <Ionicons
-                                name={icon}
+                                name={section.icon as any}
                                 size={16}
                                 color={colors.textSecondary}
                             />
-                            <Text style={styles.title}>{title}</Text>
+                            <Text style={styles.title}>{section.title}</Text>
                         </View>
-                        {subtitle && (
-                            <Text style={styles.subtitle} numberOfLines={1}>
-                                {subtitle}
-                            </Text>
-                        )}
+                        <Text style={styles.subtitle} numberOfLines={1}>
+                            {subtitle}
+                        </Text>
                     </View>
 
-                    <View style={styles.countBadge}>
-                        <Text style={styles.countText}>{notices.length}</Text>
-                    </View>
+                    <Pressable
+                        onPress={() => {
+                            haptics.tap();
+                            togglePin(section.id);
+                        }}
+                        style={({ pressed }) => [
+                            styles.iconButton,
+                            pressed && styles.iconPressed,
+                        ]}
+                        hitSlop={10}
+                    >
+                        <BlurView
+                            intensity={40}
+                            tint="dark"
+                            style={StyleSheet.absoluteFillObject}
+                        />
+                        <View style={styles.iconFill} />
+                        <Ionicons
+                            name={section.pinned ? 'pin' : 'pin-outline'}
+                            size={18}
+                            color={section.pinned ? '#FFB570' : colors.textPrimary}
+                        />
+                    </Pressable>
+
+                    <Pressable
+                        onPress={() => {
+                            haptics.tap();
+                            toggleAlarm(section.id);
+                        }}
+                        style={({ pressed }) => [
+                            styles.iconButton,
+                            pressed && styles.iconPressed,
+                        ]}
+                        hitSlop={10}
+                    >
+                        <BlurView
+                            intensity={40}
+                            tint="dark"
+                            style={StyleSheet.absoluteFillObject}
+                        />
+                        <View style={styles.iconFill} />
+                        <Ionicons
+                            name={
+                                section.alarmOn
+                                    ? 'notifications'
+                                    : 'notifications-outline'
+                            }
+                            size={18}
+                            color={
+                                section.alarmOn ? '#7C5CFF' : colors.textPrimary
+                            }
+                        />
+                    </Pressable>
                 </View>
 
                 <ScrollRefProvider value={scrollRef}>
@@ -140,40 +188,43 @@ export default function SectionDetailScreen({
                         showsVerticalScrollIndicator={false}
                         directionalLockEnabled
                     >
-                        {notices.length === 0 ? (
+                        {list.length === 0 ? (
                             <View style={styles.empty}>
                                 <Text style={styles.emptyText}>
                                     표시할 공지가 없어요.
                                 </Text>
                             </View>
                         ) : (
-                            notices.map(notice => (
-                                <SwipeableNoticeRow
+                            list.map(notice => (
+                                <Animated.View
                                     key={notice.id}
-                                    rowId={notice.id}
-                                    activeRowId={activeRowId}
-                                    onActivate={setActiveRowId}
-                                    onDelete={() => onDismiss(notice.id)}
+                                    entering={FadeIn.duration(180)}
+                                    exiting={FadeOut.duration(160)}
+                                    layout={Layout.springify().damping(20)}
                                 >
-                                    <NoticeListItem
-                                        notice={notice}
-                                        showViews={showViews}
-                                    />
-                                </SwipeableNoticeRow>
+                                    <SwipeableNoticeRow
+                                        rowId={notice.id}
+                                        activeRowId={activeRowId}
+                                        onActivate={setActiveRowId}
+                                        onDelete={() => dismiss(notice.id)}
+                                    >
+                                        <NoticeListItem
+                                            notice={notice}
+                                            showViews={section.showViews}
+                                        />
+                                    </SwipeableNoticeRow>
+                                </Animated.View>
                             ))
                         )}
                     </ScrollView>
                 </ScrollRefProvider>
             </SafeAreaView>
-        </Animated.View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: colors.bgTop,
-    },
+    root: { flex: 1, backgroundColor: colors.bgTop },
     safe: { flex: 1 },
     header: {
         flexDirection: 'row',
@@ -181,40 +232,30 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.xl,
         paddingTop: spacing.sm,
         paddingBottom: spacing.lg,
-        gap: spacing.md,
+        gap: spacing.sm,
     },
-    backButton: {
-        width: 40, height: 40,
+    iconButton: {
+        width: 40,
+        height: 40,
         borderRadius: radius.md,
         overflow: 'hidden',
-        alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.glassBorder,
     },
-    backFill: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.glassFill },
-    backButtonPressed: { opacity: 0.7 },
-    titleBlock: { flex: 1 },
+    iconFill: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: colors.glassFill,
+    },
+    iconPressed: { opacity: 0.7 },
+    titleBlock: { flex: 1, marginHorizontal: spacing.sm },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     title: { ...typography.title, color: colors.textPrimary, fontSize: 18 },
     subtitle: {
         ...typography.caption,
         color: colors.textTertiary,
         marginTop: 2,
-    },
-    countBadge: {
-        minWidth: 32,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-        backgroundColor: colors.glassFillStrong,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: colors.glassBorderSoft,
-        alignItems: 'center',
-    },
-    countText: {
-        ...typography.label,
-        color: colors.textPrimary,
-        fontSize: 12,
     },
     scrollContent: {
         paddingHorizontal: spacing.xl,
@@ -223,4 +264,10 @@ const styles = StyleSheet.create({
     },
     empty: { paddingVertical: spacing.xxl * 2, alignItems: 'center' },
     emptyText: { ...typography.caption, color: colors.textTertiary },
+    notFound: {
+        ...typography.body,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: spacing.xxl,
+    },
 });
