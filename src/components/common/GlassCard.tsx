@@ -1,10 +1,11 @@
 import React from 'react';
 import { Platform, StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { colors, radius } from '../../constants/theme';
+import { radius, shadows } from '../../constants/theme';
 
 interface Props extends ViewProps {
     intensity?: number;
+    /** 'soft' = 리스트 아이템 등 가벼운 카드, 'strong' = 메인 컨테이너 */
     variant?: 'soft' | 'strong';
     radiusSize?: keyof typeof radius;
     children?: React.ReactNode;
@@ -12,10 +13,15 @@ interface Props extends ViewProps {
 }
 
 /**
- * 글래스모피즘 베이스.
- * - iOS: systemUltraThinMaterialDark 틴트로 네이티브 유리 질감.
- * - fill은 거의 0에 가깝게 → blur 자체가 배경과 섞이게 둔다.
- * - 1px 상단 하이라이트로 유리 단면 표현.
+ * 토스 스타일 글래스 카드.
+ *
+ * 디자인 결정:
+ *  - 상단 1px 흰 선(highlight) 제거 → 경계는 그림자/블러로만.
+ *  - fill 3~5%로 배경에 거의 녹는 투명도.
+ *  - 큰 shadowRadius + 낮은 opacity로 "공중에 떠 있는" 느낌.
+ *
+ * 단일 View 구조: iOS의 layer shadow는 masksToBounds(overflow:hidden)에
+ * 영향받지 않으므로 한 View에서 그림자와 클리핑을 동시에 처리한다.
  */
 export default function GlassCard({
     intensity,
@@ -29,26 +35,26 @@ export default function GlassCard({
     const isStrong = variant === 'strong';
     const borderRadius = radius[radiusSize];
 
-    // iOS: 네이티브 UltraThin → 배경이 그대로 비치는 맑은 유리
-    // Android: dark (블러 지원 제한적이라 fill로 보완)
-    const blurTint = Platform.OS === 'ios'
-        ? 'systemUltraThinMaterialDark'
-        : 'dark';
-    const blurIntensity = intensity ?? (isStrong ? 80 : 60);
+    const isIOS = Platform.OS === 'ios';
+    const blurTint = isIOS ? 'systemUltraThinMaterialDark' : 'dark';
+    const blurIntensity = intensity ?? (isStrong ? 70 : 50);
 
-    // Android fallback fill: iOS보다 살짝 더 불투명하게
-    const fillOpacity = Platform.OS === 'ios'
-        ? (isStrong ? 0.04 : 0.03)
+    // 거의 보이지 않을 정도로만. blur가 깊이의 주역.
+    const fillOpacity = isIOS
+        ? (isStrong ? 0.05 : 0.035)
         : (isStrong ? 0.14 : 0.10);
+
+    const borderColor = isStrong
+        ? 'rgba(255,255,255,0.08)'
+        : 'rgba(255,255,255,0.05)';
+
+    const elevation = isStrong ? shadows.elevated : shadows.soft;
 
     return (
         <View
             style={[
-                styles.container,
-                {
-                    borderRadius,
-                    borderColor: isStrong ? colors.glassBorder : colors.glassBorderSoft,
-                },
+                elevation,
+                { borderRadius, overflow: 'hidden' },
                 style,
             ]}
             {...rest}
@@ -56,22 +62,24 @@ export default function GlassCard({
             <BlurView
                 intensity={blurIntensity}
                 tint={blurTint as any}
-                style={[StyleSheet.absoluteFillObject, { borderRadius }]}
+                style={StyleSheet.absoluteFillObject}
             />
-            {/* 극소량의 fill — blur 위에 살짝 덮어 경계 부드럽게 */}
             <View
                 pointerEvents="none"
                 style={[
                     StyleSheet.absoluteFillObject,
-                    { borderRadius, backgroundColor: `rgba(255,255,255,${fillOpacity})` },
+                    { backgroundColor: `rgba(255,255,255,${fillOpacity})` },
                 ]}
             />
-            {/* 상단 1px 하이라이트 — 유리 단면 굴절 */}
             <View
                 pointerEvents="none"
                 style={[
-                    styles.topHighlight,
-                    { borderTopLeftRadius: borderRadius, borderTopRightRadius: borderRadius },
+                    StyleSheet.absoluteFillObject,
+                    {
+                        borderRadius,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor,
+                    },
                 ]}
             />
             <View style={[styles.content, contentStyle]}>{children}</View>
@@ -80,16 +88,5 @@ export default function GlassCard({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        borderWidth: StyleSheet.hairlineWidth,
-        overflow: 'hidden',
-    },
-    topHighlight: {
-        position: 'absolute',
-        top: 0, left: 0, right: 0,
-        height: 1,
-        backgroundColor: 'rgba(255,255,255,0.30)',
-    },
-    // flex: 1 추가 — SectionCard 등 내부가 flex를 쓸 때 높이가 붕괴되지 않도록
     content: { flex: 1 },
 });

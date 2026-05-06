@@ -60,10 +60,10 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         alignItems: 'center', justifyContent: 'center',
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: colors.glassBorder,
+        borderColor: 'rgba(255,255,255,0.06)',
     },
     iconFill: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: colors.glassFill,
+        backgroundColor: 'rgba(255,255,255,0.04)',
     },
 });
