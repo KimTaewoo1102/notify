@@ -57,7 +57,7 @@ export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>)
     const moveToTrash = useSectionsStore(s => s.moveToTrash);
     const allSections = useSectionsStore(s => s.sections);
 
-    const { today, keyword, hot, loading } = useNotices({
+    const { today, keyword, hot, pinned, loading } = useNotices({
         universityId,
         keywords,
     });
@@ -96,24 +96,35 @@ export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>)
 
     const renderItem = useCallback(
         ({ item, drag, isActive }: RenderItemParams<Section>) => {
-            const list = noticesByFeed[item.feed] ?? [];
+            const isLocked = item.isSystem === 'pinned-default';
+            const list =
+                isLocked
+                    ? pinned
+                    : noticesByFeed[item.feed] ?? [];
+            const itemSubtitle = isLocked
+                ? `고정된 공지 · ${list.length}건`
+                : buildSubtitle(item.feed, list.length, keywords);
             return (
-                <ScaleDecorator activeScale={1.04}>
+                <ScaleDecorator activeScale={isLocked ? 1 : 1.04}>
                     <View style={styles.sectionWrap}>
                         <SectionCard
                             title={item.title}
-                            subtitle={buildSubtitle(item.feed, list.length, keywords)}
+                            subtitle={itemSubtitle}
                             icon={item.icon as any}
                             notices={list}
                             showViews={item.showViews}
                             alarmOn={item.alarmOn}
                             pinned={item.pinned}
-                            jiggling={jiggleMode && !isActive}
-                            onTrash={() => moveToTrash(item.id)}
-                            onLongPress={() => {
-                                enterJiggle();
-                                drag();
-                            }}
+                            jiggling={jiggleMode && !isActive && !isLocked}
+                            onTrash={isLocked ? undefined : () => moveToTrash(item.id)}
+                            onLongPress={
+                                isLocked
+                                    ? undefined
+                                    : () => {
+                                          enterJiggle();
+                                          drag();
+                                      }
+                            }
                             onPress={() =>
                                 navigation.navigate('SectionDetail', {
                                     sectionId: item.id,
@@ -124,7 +135,15 @@ export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>)
                 </ScaleDecorator>
             );
         },
-        [noticesByFeed, keywords, jiggleMode, enterJiggle, moveToTrash, navigation],
+        [
+            noticesByFeed,
+            pinned,
+            keywords,
+            jiggleMode,
+            enterJiggle,
+            moveToTrash,
+            navigation,
+        ],
     );
 
     return (

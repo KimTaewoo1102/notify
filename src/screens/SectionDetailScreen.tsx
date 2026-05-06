@@ -35,7 +35,7 @@ export default function SectionDetailScreen({
     const toggleAlarm = useSectionsStore(s => s.toggleAlarm);
     const togglePin = useSectionsStore(s => s.togglePin);
 
-    const { today, keyword, hot, dismiss } = useNotices({
+    const { today, keyword, hot, pinned, dismiss } = useNotices({
         universityId: 'uos',
         keywords,
     });
@@ -45,6 +45,8 @@ export default function SectionDetailScreen({
 
     const list = useMemo<Notice[]>(() => {
         if (!section) return [];
+        // 시스템 '고정' 섹션은 사용자 핀 공지 합집합을 데이터로 사용
+        if (section.isSystem === 'pinned-default') return pinned;
         switch (section.feed) {
             case 'today':
                 return today;
@@ -55,10 +57,15 @@ export default function SectionDetailScreen({
             default:
                 return [];
         }
-    }, [section, today, hot, keyword]);
+    }, [section, today, hot, keyword, pinned]);
 
     const subtitle = useMemo(() => {
         if (!section) return '';
+        if (section.isSystem === 'pinned-default') {
+            return list.length === 0
+                ? '공지를 길게 눌러 고정해보세요'
+                : `고정된 공지 · ${list.length}건`;
+        }
         if (section.feed === 'keyword') {
             return keywords.length === 0
                 ? '키워드를 등록하면 맞춤 공지가 나타나요'
@@ -126,29 +133,31 @@ export default function SectionDetailScreen({
                         </Text>
                     </View>
 
-                    <Pressable
-                        onPress={() => {
-                            haptics.tap();
-                            togglePin(section.id);
-                        }}
-                        style={({ pressed }) => [
-                            styles.iconButton,
-                            pressed && styles.iconPressed,
-                        ]}
-                        hitSlop={10}
-                    >
-                        <BlurView
-                            intensity={40}
-                            tint="dark"
-                            style={StyleSheet.absoluteFillObject}
-                        />
-                        <View style={styles.iconFill} />
-                        <Ionicons
-                            name={section.pinned ? 'pin' : 'pin-outline'}
-                            size={18}
-                            color={section.pinned ? '#FFB570' : colors.textPrimary}
-                        />
-                    </Pressable>
+                    {section.isSystem !== 'pinned-default' && (
+                        <Pressable
+                            onPress={() => {
+                                haptics.tap();
+                                togglePin(section.id);
+                            }}
+                            style={({ pressed }) => [
+                                styles.iconButton,
+                                pressed && styles.iconPressed,
+                            ]}
+                            hitSlop={10}
+                        >
+                            <BlurView
+                                intensity={40}
+                                tint="dark"
+                                style={StyleSheet.absoluteFillObject}
+                            />
+                            <View style={styles.iconFill} />
+                            <Ionicons
+                                name={section.pinned ? 'pin' : 'pin-outline'}
+                                size={18}
+                                color={section.pinned ? '#FFB570' : colors.textPrimary}
+                            />
+                        </Pressable>
+                    )}
 
                     <Pressable
                         onPress={() => {
