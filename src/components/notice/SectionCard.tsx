@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
     cancelAnimation,
     Easing,
-    interpolate,
     useAnimatedStyle,
     useSharedValue,
     withDelay,
@@ -65,7 +64,6 @@ export default function SectionCard({
     const previews = notices.slice(0, previewCount);
     const remaining = Math.max(0, notices.length - previewCount);
 
-    const [size, setSize] = useState({ w: 0, h: 0 });
     const rotate = useSharedValue(0);
     const scale = useSharedValue(1);
 
@@ -109,13 +107,8 @@ export default function SectionCard({
         onPress();
     };
 
-    const handleLayout = (e: LayoutChangeEvent) => {
-        const { width, height } = e.nativeEvent.layout;
-        setSize({ w: width, h: height });
-    };
-
     return (
-        <Animated.View style={[styles.outer, containerStyle]} onLayout={handleLayout}>
+        <Animated.View style={[styles.outer, containerStyle]}>
             <GlassCard radiusSize="lg" variant="strong" style={styles.card}>
                 <Pressable
                     onPress={handleEnter}
@@ -189,15 +182,8 @@ export default function SectionCard({
                 </View>
             </GlassCard>
 
-            {/* Skia glow 보더 (알림 ON일 때만 호흡) */}
-            <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-                <GlowBorder
-                    width={size.w}
-                    height={size.h}
-                    radius={radius.lg}
-                    active={alarmOn}
-                />
-            </View>
+            {/* 알림 ON 글로우 보더 — Reanimated borderColor + shadow 호흡 */}
+            <GlowBorder radius={radius.lg} active={alarmOn} />
 
             {/* Jiggle 모드 좌상단 삭제 버튼 */}
             {jiggling && onTrash && (
