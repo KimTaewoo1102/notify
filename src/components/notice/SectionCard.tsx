@@ -93,7 +93,7 @@ export default function SectionCard({
 }
 
 const styles = StyleSheet.create({
-    card: { flex: 1, overflow: 'hidden' },
+    card: { flex: 1 },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.divider,
         marginHorizontal: spacing.lg,
     },
-    body: { flex: 1, justifyContent: 'center' },
+    body: { flex: 1, justifyContent: 'space-evenly' },
     rowDivider: {
         height: StyleSheet.hairlineWidth,
         backgroundColor: colors.divider,

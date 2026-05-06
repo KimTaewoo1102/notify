@@ -55,7 +55,7 @@ export default function MenuModal({ visible, onClose, items }: Props) {
                 </Pressable>
 
                 <Animated.View style={[styles.sheet, { transform: [{ scale }] }]}>
-                    <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFillObject} />
+                    <BlurView intensity={80} tint={"systemUltraThinMaterialDark" as any} style={StyleSheet.absoluteFillObject} />
                     <View style={[StyleSheet.absoluteFillObject, styles.sheetFill]} />
                     <View style={styles.sheetHighlight} pointerEvents="none" />
 
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.glassBorder,
     },
-    sheetFill: { backgroundColor: 'rgba(15,15,18,0.7)' },
+    sheetFill: { backgroundColor: 'rgba(255,255,255,0.04)' },
     sheetHighlight: {
         position: 'absolute',
         top: 0, left: 0, right: 0, height: 1,
