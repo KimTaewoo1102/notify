@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { mmkvStorage } from './storage';
+import { persistStorage } from './storage';
 import type { NoticeFeed } from '../types/notice';
 
 export type SectionId = string;
@@ -204,7 +204,7 @@ export const useSectionsStore = create<SectionsState>()(
         {
             name: 'notify-sections-v2',
             version: 2,
-            storage: createJSONStorage(() => mmkvStorage),
+            storage: createJSONStorage(() => persistStorage),
             migrate: (persisted, version) => {
                 // v1 → v2: 시스템 'pinned-default' 섹션 주입 + order 채움
                 if (!persisted || typeof persisted !== 'object') return persisted as any;

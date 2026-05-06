@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { mmkvStorage } from './storage';
+import { persistStorage } from './storage';
 import type { Notice } from '../types/notice';
 import type { SectionId } from './sectionsStore';
 
@@ -117,7 +117,7 @@ export const useNoticesStore = create<NoticesState>()(
         {
             name: 'notify-notices-meta-v1',
             version: 1,
-            storage: createJSONStorage(() => mmkvStorage),
+            storage: createJSONStorage(() => persistStorage),
         },
     ),
 );
