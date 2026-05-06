@@ -56,19 +56,23 @@ export const typography = {
     brand: { fontSize: 22, fontWeight: '300' as const, letterSpacing: 12 },
 } as const;
 
+/**
+ * 토스 스타일 부드러운 떠 있는 그림자.
+ * 큰 radius + 낮은 opacity로 "공중에 떠 있는" 느낌만 부여.
+ */
 export const shadows = {
-    glass: {
+    soft: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 18 },
-        shadowOpacity: 0.45,
-        shadowRadius: 28,
-        elevation: 12,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.28,
+        shadowRadius: 18,
+        elevation: 4,
     },
-    card: {
+    elevated: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
-        shadowRadius: 16,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.45,
+        shadowRadius: 32,
+        elevation: 12,
     },
 } as const;
