@@ -22,6 +22,7 @@ interface SectionsActions {
         emoji?: string;
     }) => Section;
     removeSection: (id: ID) => void;
+    restoreSection: (section: Section) => void;
     renameSection: (id: ID, title: string) => void;
     reorderSections: (newOrderedIds: ID[]) => void;
     togglePin: (id: ID) => void;
@@ -74,6 +75,15 @@ export const useSectionsStore = create<SectionsStore>()(
                     return {
                         sections: next,
                         orderedIds: s.orderedIds.filter(x => x !== id),
+                    };
+                }),
+
+            restoreSection: (section) =>
+                set(s => {
+                    if (s.sections[section.id]) return s;
+                    return {
+                        sections: { ...s.sections, [section.id]: section },
+                        orderedIds: [...s.orderedIds, section.id],
                     };
                 }),
 

@@ -30,6 +30,7 @@ import {
     useOrderedSections,
     useSectionsStore,
 } from '../stores/sectionsStore';
+import { useTrashStore } from '../stores/trashStore';
 import { useUIStore } from '../stores/uiStore';
 import type { Section } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -42,8 +43,19 @@ export default function HomeScreen({ navigation }: Props) {
     const setEditMode = useUIStore(s => s.setEditMode);
     const openAdd = useUIStore(s => s.openAddSection);
 
+    const sections_map = useSectionsStore(s => s.sections);
     const reorder = useSectionsStore(s => s.reorderSections);
     const removeSection = useSectionsStore(s => s.removeSection);
+    const pushToTrash = useTrashStore(s => s.pushSection);
+
+    const deleteSection = useCallback(
+        (id: string) => {
+            const sec = sections_map[id];
+            if (sec) pushToTrash(sec);
+            removeSection(id);
+        },
+        [sections_map, pushToTrash, removeSection],
+    );
 
     // 섹션이 0이 되면 자동으로 편집 모드 해제.
     useEffect(() => {
@@ -121,7 +133,7 @@ export default function HomeScreen({ navigation }: Props) {
                                             isDragActive={isActive}
                                             onDelete={() => {
                                                 haptic('warning');
-                                                removeSection(item.id);
+                                                deleteSection(item.id);
                                             }}
                                         />
                                     </Pressable>
@@ -137,7 +149,7 @@ export default function HomeScreen({ navigation }: Props) {
                     contentContainerStyle={styles.list}
                     renderItem={({ item }) => (
                         <SwipeableSectionRow
-                            onDelete={() => removeSection(item.id)}
+                            onDelete={() => deleteSection(item.id)}
                         >
                             <SectionCard
                                 section={item}
