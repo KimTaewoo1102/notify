@@ -35,6 +35,8 @@ export interface Section {
     keywords: Keyword[];
     createdAt: number;
     updatedAt: number;
+    /** 사용자가 이 섹션 상세 화면을 마지막으로 떠난 시각 (unread 판정 기준). */
+    lastVisitedAt: number | null;
 }
 
 export interface Notice {

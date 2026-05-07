@@ -19,3 +19,8 @@ export type {
     PinnedNoticeEntry,
 } from './noticesStore';
 export { useUIStore } from './uiStore';
+export {
+    useNoticeCacheStore,
+    useNoticeCacheForSection,
+    useUnreadCount,
+} from './noticeCacheStore';

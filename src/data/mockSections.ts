@@ -74,5 +74,6 @@ export function buildMockSections(): Section[] {
         })),
         createdAt: NOW,
         updatedAt: NOW,
+        lastVisitedAt: null,
     }));
 }
