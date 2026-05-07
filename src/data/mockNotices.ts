@@ -1,8 +1,8 @@
-import type { Notice } from '../types/notice';
+import type { Notice } from '../types/domain';
 
 /**
  * 실제 API 응답을 그대로 흉내낸 mock.
- * 필드는 Notice 타입과 1:1 — 백엔드 연동 시 이 파일 자체가 사라진다.
+ * 백엔드 연동 시 이 파일은 사라진다.
  */
 export const mockNotices: Notice[] = [
     {

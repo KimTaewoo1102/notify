@@ -1,11 +1,10 @@
-import type { Notice } from '../../types/notice';
+import type { Notice } from '../../types/domain';
 import { mockNotices } from '../../data/mockNotices';
 import type { UniversityAdapter } from './types';
 
 /**
- * 서울시립대 어댑터.
- * 현재는 mock에서 필터링하지만, 추후 아래 함수들 본문만
- * fetch('/api/uos/...')로 교체하면 UI 코드는 손댈 필요 없다.
+ * 서울시립대 어댑터. 현재는 mock에서 필터링.
+ * 추후 fetch('/api/uos/...')로 본문만 교체하면 화면 코드는 손댈 필요 없다.
  */
 export const uosAdapter: UniversityAdapter = {
     id: 'uos',
@@ -15,9 +14,10 @@ export const uosAdapter: UniversityAdapter = {
     async fetchToday(): Promise<Notice[]> {
         return mockNotices
             .filter(n => n.universityId === 'uos')
-            .sort((a, b) =>
-                Number(!!b.isSourcePinned) - Number(!!a.isSourcePinned) ||
-                +new Date(b.publishedAt) - +new Date(a.publishedAt),
+            .sort(
+                (a, b) =>
+                    Number(!!b.isSourcePinned) - Number(!!a.isSourcePinned) ||
+                    +new Date(b.publishedAt) - +new Date(a.publishedAt),
             );
     },
 

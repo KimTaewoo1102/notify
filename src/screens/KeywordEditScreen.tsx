@@ -1,28 +1,23 @@
-import React, { useLayoutEffect } from 'react';
+import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 import { colors, spacing, radius, typography } from '../ui/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 
-type Props = RootStackScreenProps<'SectionDetail'>;
+type Props = RootStackScreenProps<'KeywordEdit'>;
 
-export default function SectionDetailScreen({ navigation, route }: Props) {
+export default function KeywordEditScreen({ navigation, route }: Props) {
     const { sectionId } = route.params;
-
-    useLayoutEffect(() => {
-        navigation.setOptions({ title: `Section · ${sectionId}` });
-    }, [navigation, sectionId]);
 
     return (
         <View style={styles.root}>
-            <Text style={styles.label}>sectionId</Text>
+            <Text style={styles.label}>편집 대상 섹션</Text>
             <Text style={styles.value}>{sectionId}</Text>
-
             <Pressable
-                onPress={() => navigation.navigate('KeywordEdit', { sectionId })}
+                onPress={() => navigation.goBack()}
                 style={({ pressed }) => [styles.button, pressed && styles.pressed]}
             >
-                <Text style={styles.buttonLabel}>이 섹션의 키워드 편집</Text>
+                <Text style={styles.buttonLabel}>닫기</Text>
             </Pressable>
         </View>
     );

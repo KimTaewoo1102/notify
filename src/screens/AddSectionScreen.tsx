@@ -1,28 +1,20 @@
-import React, { useLayoutEffect } from 'react';
+import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 import { colors, spacing, radius, typography } from '../ui/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 
-type Props = RootStackScreenProps<'SectionDetail'>;
+type Props = RootStackScreenProps<'AddSection'>;
 
-export default function SectionDetailScreen({ navigation, route }: Props) {
-    const { sectionId } = route.params;
-
-    useLayoutEffect(() => {
-        navigation.setOptions({ title: `Section · ${sectionId}` });
-    }, [navigation, sectionId]);
-
+export default function AddSectionScreen({ navigation }: Props) {
     return (
         <View style={styles.root}>
-            <Text style={styles.label}>sectionId</Text>
-            <Text style={styles.value}>{sectionId}</Text>
-
+            <Text style={styles.value}>새 섹션 추가 (placeholder)</Text>
             <Pressable
-                onPress={() => navigation.navigate('KeywordEdit', { sectionId })}
+                onPress={() => navigation.goBack()}
                 style={({ pressed }) => [styles.button, pressed && styles.pressed]}
             >
-                <Text style={styles.buttonLabel}>이 섹션의 키워드 편집</Text>
+                <Text style={styles.buttonLabel}>닫기</Text>
             </Pressable>
         </View>
     );
@@ -30,7 +22,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase, padding: spacing.lg, gap: spacing.md },
-    label: { ...typography.caption, color: colors.textMuted },
     value: { ...typography.h2, color: colors.textPrimary },
     button: {
         marginTop: spacing.lg,
