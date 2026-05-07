@@ -84,7 +84,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
     const section = useSectionsStore(s => s.sections[sectionId]);
     const toggleNotify = useSectionsStore(s => s.toggleNotify);
-    const togglePin = useSectionsStore(s => s.togglePin);
     const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
 
     const markManyDeleted = useNoticesStore(s => s.markManyDeleted);
@@ -306,27 +305,22 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     return (
         <View style={styles.root}>
             <ScrollView contentContainerStyle={styles.content}>
-                {/* Summary card */}
-                <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
-                    <View style={styles.summaryHead}>
-                        {isSystemPin ? (
+                {/* 시스템 섹션(고정)은 상단 요약 카드만 표시 */}
+                {isSystemPin && (
+                    <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
+                        <View style={styles.summaryHead}>
                             <Ionicons name="pin" size={16} color={accent} />
-                        ) : (
-                            <View style={[styles.dot, { backgroundColor: accent }]} />
-                        )}
-                        <Text style={styles.summaryTitle}>
-                            {isSystemPin ? '고정한 공지' : section.title}
+                            <Text style={styles.summaryTitle}>고정한 공지</Text>
+                        </View>
+                        <Text style={styles.summaryMeta}>
+                            {`${pinnedNoticesForSystem.length}개 공지 · 길게 눌러 해제`}
                         </Text>
-                    </View>
-                    <Text style={styles.summaryMeta}>
-                        {isSystemPin
-                            ? `${pinnedNoticesForSystem.length}개 공지 · 길게 눌러 해제`
-                            : `키워드 ${section.keywords.length} · ${section.universityId.toUpperCase()}`}
-                    </Text>
-                </Card>
+                    </Card>
+                )}
 
                 {showSectionControls && (
                     <>
+                        {/* 알림 ON/OFF 버튼 (핀 버튼은 제거 #7) */}
                         <View style={styles.pills}>
                             <ActionPill
                                 icon={section.notifyOn ? 'notifications' : 'notifications-off'}
@@ -335,27 +329,41 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                                 on={section.notifyOn}
                                 onPress={() => toggleNotify(section.id)}
                             />
-                            <ActionPill
-                                icon={section.pinned ? 'pin' : 'pin-outline'}
-                                label={section.pinned ? '고정 됨' : '고정'}
-                                accent={accent}
-                                on={section.pinned}
-                                onPress={() => togglePin(section.id)}
-                            />
                         </View>
 
+                        {/* 키워드 편집 카드 — 현재 키워드 칩 표시 (#9) */}
                         <PressableScale
                             onPress={() => openKeywordEdit(section.id)}
                             hapticKind="light"
                             style={[styles.editBtn, { borderColor: accent + '55' }]}
                         >
-                            <Ionicons name="pricetag" size={16} color={accent} />
-                            <Text style={styles.editLabel}>키워드 편집</Text>
-                            <View style={[styles.editBadge, { backgroundColor: accent + '22' }]}>
-                                <Text style={[styles.editBadgeText, { color: accent }]}>
-                                    {section.keywords.length}
-                                </Text>
+                            <View style={styles.editBtnTop}>
+                                <Ionicons name="pricetag" size={16} color={accent} />
+                                <Text style={styles.editLabel}>키워드 편집</Text>
+                                <View style={[styles.editBadge, { backgroundColor: accent + '22' }]}>
+                                    <Text style={[styles.editBadgeText, { color: accent }]}>
+                                        {section.keywords.length}
+                                    </Text>
+                                </View>
                             </View>
+                            {section.keywords.length > 0 ? (
+                                <View style={styles.chipRow}>
+                                    {section.keywords.map(kw => (
+                                        <View
+                                            key={kw.id}
+                                            style={[styles.chip, { backgroundColor: accent + '20', borderColor: accent + '44' }]}
+                                        >
+                                            <Text style={[styles.chipText, { color: accent }]}>
+                                                {kw.text}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : (
+                                <Text style={styles.noKeywordHint}>
+                                    + 키워드를 추가해 관련 공지를 받아보세요
+                                </Text>
+                            )}
                         </PressableScale>
                     </>
                 )}
@@ -690,14 +698,17 @@ const styles = StyleSheet.create({
     pillLabel: { ...typography.bodySm },
 
     editBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
         backgroundColor: colors.bgRaised,
         borderWidth: 1,
         borderRadius: radius.lg,
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
+        gap: spacing.sm,
+    },
+    editBtnTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
     },
     editLabel: { ...typography.body, color: colors.textPrimary, flex: 1 },
     editBadge: {
@@ -706,6 +717,28 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     editBadgeText: { ...typography.caption, fontWeight: '700' },
+    // 키워드 칩 행
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.xs,
+        marginTop: spacing.xs,
+    },
+    chip: {
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+    },
+    chipText: {
+        ...typography.caption,
+        fontWeight: '600',
+    },
+    noKeywordHint: {
+        ...typography.caption,
+        color: colors.textMuted,
+        marginTop: spacing.xs,
+    },
 
     section: { gap: spacing.sm },
     sectionHeader: {
