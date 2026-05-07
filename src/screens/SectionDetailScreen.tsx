@@ -33,11 +33,13 @@ import {
 import { SectionTrashButton } from '../features/notices/components/SectionTrashButton';
 import { SelectionActionBar } from '../features/notices/components/SelectionActionBar';
 import { NoticeBulkDeleteModal } from '../features/notices/components/NoticeBulkDeleteModal';
+import { SwipeableNoticeRow } from '../features/notices/components/SwipeableNoticeRow';
 import {
     NoticeContextMenu,
     type NoticeMenuAnchor,
     type NoticeMenuItem,
 } from '../features/notices/components/NoticeContextMenu';
+import { useNoticeCacheStore } from '../stores/noticeCacheStore';
 import { uosAdapter } from '../services/universities/uos';
 import type { Notice, ID } from '../types/domain';
 import { SYSTEM_PIN_SECTION_ID } from '../types/domain';
@@ -84,7 +86,19 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
     const section = useSectionsStore(s => s.sections[sectionId]);
     const toggleNotify = useSectionsStore(s => s.toggleNotify);
+    const markVisited = useSectionsStore(s => s.markVisited);
+    const updateNoticeCount = useSectionsStore(s => s.updateNoticeCount);
     const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
+    const setNoticeCache = useNoticeCacheStore(s => s.setCache);
+
+    // 화면 진입 시점의 lastVisitedAt 스냅샷 — 이 시점 기준으로 "신규" 판별.
+    // section이 처음 로드될 때 한 번만 캡처 (ref 사용).
+    const entryLastVisitedAt = useRef<number | null>(null);
+    useEffect(() => {
+        if (entryLastVisitedAt.current === null && section) {
+            entryLastVisitedAt.current = section.lastVisitedAt ?? null;
+        }
+    }, [section]);
 
     const markManyDeleted = useNoticesStore(s => s.markManyDeleted);
     const togglePinNotice = useNoticesStore(s => s.togglePin);
@@ -126,7 +140,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     );
 
     const fetchNotices = useCallback(async () => {
-        if (isSystemPin) return; // pinned source 는 store 에서 직접 옴
+        if (isSystemPin) return;
         if (!section || section.keywords.length === 0) {
             setAllNotices([]);
             return;
@@ -137,10 +151,22 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 section.keywords.map(k => k.text),
             );
             setAllNotices(results);
+            // 캐시 & 카운트 동기화 → 홈화면 미리보기/뱃지 즉시 반영
+            setNoticeCache(sectionId, results);
+            updateNoticeCount(sectionId, results.length);
         } finally {
             setLoading(false);
         }
-    }, [section, isSystemPin]);
+    }, [section, isSystemPin, sectionId, setNoticeCache, updateNoticeCount]);
+
+    // 화면을 떠날 때 lastVisitedAt 갱신 → 홈화면 복귀 시 unread 즉시 초기화
+    useEffect(() => {
+        return () => {
+            if (!isSystemPin) {
+                markVisited(sectionId);
+            }
+        };
+    }, [sectionId, isSystemPin, markVisited]);
 
     useEffect(() => {
         fetchNotices();
@@ -208,6 +234,18 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     );
 
     const closeMenu = useCallback(() => setMenuTarget(null), []);
+
+    /* ─── 개별 공지 스와이프 삭제 (#6) ────────────────── */
+    const deleteNotice = useCallback(
+        (notice: Notice) => {
+            const src = isSystemPin
+                ? notice.originalSectionId ?? SYSTEM_PIN_SECTION_ID
+                : sectionId;
+            markManyDeleted([notice], src);
+            haptic('warning');
+        },
+        [isSystemPin, sectionId, markManyDeleted],
+    );
 
     /* ─── Bulk delete ─────────────────────────────────── */
     const confirmDelete = useCallback(() => {
