@@ -110,6 +110,9 @@ export function HeaderBanner() {
 
     return (
         <View style={styles.wrap}>
+            <Text style={styles.university} numberOfLines={1}>
+                {uosAdapter.name}
+            </Text>
             <Pressable
                 onPress={onPressTitle}
                 hitSlop={6}
@@ -117,14 +120,11 @@ export function HeaderBanner() {
                 style={styles.titleSlot}
             >
                 <Animated.View style={animatedTitleStyle}>
-                    <Text style={styles.title} numberOfLines={1}>
-                        {current?.title ?? 'Notify'}
+                    <Text style={styles.sectionName} numberOfLines={1}>
+                        {current?.title ?? ''}
                     </Text>
                 </Animated.View>
             </Pressable>
-            <Text style={styles.subtitle} numberOfLines={1}>
-                {uosAdapter.name}
-            </Text>
         </View>
     );
 }
@@ -133,25 +133,26 @@ const styles = StyleSheet.create({
     wrap: {
         alignItems: 'center',
         justifyContent: 'center',
-        // native-stack 헤더 타이틀 슬롯 폭 제한을 고려해 자연스럽게 수직 중앙 배치.
-        paddingTop: 2,
+        paddingVertical: 1,
+    },
+    // 메인 타이틀 — 대학교명이 위계 최상위.
+    university: {
+        ...typography.h3,
+        color: colors.textPrimary,
+        textAlign: 'center',
+        letterSpacing: 0.1,
     },
     titleSlot: {
-        // 터치 영역 — 시각적으로는 타이틀과 동일.
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 8,
     },
-    title: {
-        // 기존 native-stack 헤더 타이틀과 같은 결의 타이포 (h3: 16/600/-0.1).
-        ...typography.h3,
-        color: colors.textPrimary,
-        textAlign: 'center',
-    },
-    subtitle: {
+    // 롤링 섹션명 — 서브텍스트 느낌으로 작고 은은하게.
+    sectionName: {
         ...typography.caption,
-        color: colors.textMuted,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        letterSpacing: 0.15,
         marginTop: 1,
-        letterSpacing: 0.2,
     },
 });
