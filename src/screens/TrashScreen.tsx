@@ -1,12 +1,12 @@
 import React from 'react';
 import {
     Pressable,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
@@ -15,6 +15,7 @@ import ScreenBackground from '../components/layout/ScreenBackground';
 import GlassCard from '../components/common/GlassCard';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { haptics } from '../utils/haptics';
+import { useShallow } from 'zustand/react/shallow';
 import {
     selectTrashedSections,
     useSectionsStore,
@@ -22,7 +23,7 @@ import {
 import type { RootStackScreenProps } from '../navigation/types';
 
 export default function TrashScreen({ navigation }: RootStackScreenProps<'Trash'>) {
-    const trashed = useSectionsStore(selectTrashedSections);
+    const trashed = useSectionsStore(useShallow(selectTrashedSections));
     const restore = useSectionsStore(s => s.restore);
     const purge = useSectionsStore(s => s.purge);
 

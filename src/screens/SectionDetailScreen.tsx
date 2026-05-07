@@ -1,12 +1,12 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
     Pressable,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';

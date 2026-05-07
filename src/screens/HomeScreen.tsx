@@ -2,11 +2,11 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Pressable,
-    SafeAreaView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DraggableFlatList, {
     type RenderItemParams,
@@ -25,6 +25,7 @@ import { useNotices } from '../hooks/useNotices';
 import { getUniversityAdapter } from '../services/universities';
 import { colors, spacing, typography } from '../constants/theme';
 import { haptics } from '../utils/haptics';
+import { useShallow } from 'zustand/react/shallow';
 import {
     selectActiveSections,
     useSectionsStore,
@@ -51,7 +52,7 @@ export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>)
     const [universityId] = useState('uos');
     const adapter = useMemo(() => getUniversityAdapter(universityId), [universityId]);
 
-    const sections = useSectionsStore(selectActiveSections);
+    const sections = useSectionsStore(useShallow(selectActiveSections));
     const keywords = useSectionsStore(s => s.keywords);
     const reorder = useSectionsStore(s => s.reorder);
     const moveToTrash = useSectionsStore(s => s.moveToTrash);

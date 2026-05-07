@@ -47,6 +47,10 @@ export function useNotices({ universityId, keywords }: UseNoticesArgs): UseNotic
     const pins = useNoticesStore(s => s.pins);
     const trash = useNoticesStore(s => s.trash);
 
+    // keywords를 ref로 유지해 load 콜백이 keywords 변경마다 재생성되지 않도록 함
+    const keywordsRef = React.useRef(keywords);
+    keywordsRef.current = keywords;
+
     const load = useCallback(async () => {
         setLoading(true);
         try {
@@ -56,7 +60,7 @@ export function useNotices({ universityId, keywords }: UseNoticesArgs): UseNotic
             const [t, h, k] = await Promise.all([
                 adapter.fetchToday(),
                 adapter.fetchHot(),
-                adapter.fetchByKeywords(keywords),
+                adapter.fetchByKeywords(keywordsRef.current),
             ]);
             setTodayRaw(t);
             setHotRaw(h);
@@ -64,7 +68,7 @@ export function useNotices({ universityId, keywords }: UseNoticesArgs): UseNotic
         } finally {
             setLoading(false);
         }
-    }, [universityId, keywords]);
+    }, [universityId]);
 
     useEffect(() => {
         load();
