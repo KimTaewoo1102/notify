@@ -22,9 +22,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PressableScale } from '../ui/primitives/PressableScale';
 import { haptic } from '../ui/feedback/haptics';
-import { colors, radius, shadows, spacing, typography } from '../ui/theme';
+import { colors, shadows, spacing, typography } from '../ui/theme';
+import { EditDoneButton } from '../features/home/EditDoneButton';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
+import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
 import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
 import {
     useOrderedUserSections,
@@ -69,17 +71,10 @@ export default function HomeScreen({ navigation }: Props) {
         navigation.setOptions({
             headerRight: () =>
                 userSections.length > 0 ? (
-                    <Pressable
-                        onPress={() => {
-                            haptic('selection');
-                            setEditMode(!editMode);
-                        }}
-                        hitSlop={12}
-                    >
-                        <Text style={styles.headerAction}>
-                            {editMode ? '완료' : '편집'}
-                        </Text>
-                    </Pressable>
+                    <EditDoneButton
+                        editMode={editMode}
+                        onToggle={() => setEditMode(!editMode)}
+                    />
                 ) : null,
         });
     }, [navigation, editMode, userSections.length, setEditMode]);
@@ -126,6 +121,8 @@ export default function HomeScreen({ navigation }: Props) {
         );
     }
 
+    const renderAddSlot = () => <AddSectionSlot onPress={openAdd} />;
+
     return (
         <View style={styles.root}>
             {editMode ? (
@@ -135,6 +132,7 @@ export default function HomeScreen({ navigation }: Props) {
                     contentContainerStyle={styles.list}
                     activationDistance={6}
                     ListHeaderComponent={renderPinHeader}
+                    ListFooterComponent={renderAddSlot}
                     onDragBegin={() => haptic('light')}
                     onDragEnd={({ data }) => {
                         haptic('medium');
@@ -171,6 +169,7 @@ export default function HomeScreen({ navigation }: Props) {
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.list}
                     ListHeaderComponent={renderPinHeader}
+                    ListFooterComponent={renderAddSlot}
                     renderItem={({ item }) => (
                         <SwipeableSectionRow
                             onDelete={() => deleteSection(item.id)}
@@ -184,7 +183,6 @@ export default function HomeScreen({ navigation }: Props) {
                     )}
                 />
             )}
-            <FAB onPress={openAdd} />
         </View>
     );
 }
@@ -260,30 +258,10 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
     );
 }
 
-/* ────────────────────────────── FAB ───────────────────────────────── */
-
-function FAB({ onPress }: { onPress: () => void }) {
-    return (
-        <PressableScale
-            onPress={onPress}
-            hapticKind="medium"
-            scaleTo={0.92}
-            style={styles.fab}
-        >
-            <Ionicons name="add" size={28} color="#fff" />
-        </PressableScale>
-    );
-}
-
 /* ───────────────────────────── styles ─────────────────────────────── */
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
-    headerAction: {
-        ...typography.body,
-        color: colors.accent,
-        fontWeight: '600',
-    },
     list: { padding: spacing.lg, paddingBottom: 140 },
 
     // 시스템 섹션 — user 영역과 시각 분리. 아래에 얇은 디바이더.
@@ -343,20 +321,5 @@ const styles = StyleSheet.create({
         ...typography.bodySm,
         color: colors.textMuted,
         textAlign: 'center',
-    },
-
-    fab: {
-        position: 'absolute',
-        right: spacing.xl,
-        bottom: spacing.xl,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: colors.accent,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...shadows.lg,
-        shadowColor: colors.accent,
-        shadowOpacity: 0.55,
     },
 });
