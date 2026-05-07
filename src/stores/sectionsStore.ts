@@ -6,6 +6,8 @@ import type { ID, Keyword, Section } from '../types/domain';
 import { SYSTEM_PIN_SECTION_ID } from '../types/domain';
 import { generateId } from '../utils/id';
 import { STORAGE_PREFIX, rnStorage } from './persist/asyncStorage';
+// TODO: 백엔드 연동 시 mock 시드 제거 ↓ 이 import 한 줄도 함께 삭제.
+import { buildMockSections } from '../data/mockSections';
 
 const ACCENTS = ['#7C5CFF', '#5BC0FF', '#FF7C9C', '#3DDC97', '#FFC857', '#FF9E5C'];
 
@@ -32,6 +34,8 @@ interface SectionsState {
     sections: Record<ID, Section>;
     orderedIds: ID[];
     hasHydrated: boolean;
+    /** TODO: 백엔드 연동 시 제거 — mock 시드를 한 번만 주입하기 위한 플래그. */
+    hasSeededMock: boolean;
 }
 
 interface SectionsActions {
@@ -51,6 +55,8 @@ interface SectionsActions {
     removeKeyword: (sectionId: ID, keywordId: ID) => void;
     /** 시스템 섹션이 누락된 경우(첫 실행 또는 마이그레이션 후) 자동 복구. */
     ensureSystemSections: () => void;
+    /** TODO: 백엔드 연동 시 제거 — UI 검증용 mock 섹션을 한 번만 주입. */
+    seedMockOnce: () => void;
     setHasHydrated: (v: boolean) => void;
 }
 
@@ -62,6 +68,7 @@ export const useSectionsStore = create<SectionsStore>()(
             sections: {},
             orderedIds: [],
             hasHydrated: false,
+            hasSeededMock: false,
 
             addSection: ({ title, source = '', universityId = 'uos', emoji }) => {
                 const id = generateId();
@@ -220,6 +227,31 @@ export const useSectionsStore = create<SectionsStore>()(
                     };
                 }),
 
+            // TODO: 백엔드 연동 시 제거 ↓
+            seedMockOnce: () =>
+                set(s => {
+                    if (s.hasSeededMock) return s;
+                    // 이미 사용자가 만든 섹션이 있으면 시드하지 않는다 (사용자 데이터 보호).
+                    const hasUser = Object.values(s.sections).some(
+                        x => x.kind === 'user',
+                    );
+                    if (hasUser) return { ...s, hasSeededMock: true };
+
+                    const mocks = buildMockSections();
+                    const nextSections = { ...s.sections };
+                    const newIds: string[] = [];
+                    for (const m of mocks) {
+                        nextSections[m.id] = m;
+                        newIds.push(m.id);
+                    }
+                    return {
+                        sections: nextSections,
+                        orderedIds: [...s.orderedIds, ...newIds],
+                        hasSeededMock: true,
+                    };
+                }),
+            // ↑ TODO: 백엔드 연동 시 제거
+
             setHasHydrated: (v) => set({ hasHydrated: v }),
         }),
         {
@@ -229,6 +261,7 @@ export const useSectionsStore = create<SectionsStore>()(
             partialize: (s) => ({
                 sections: s.sections,
                 orderedIds: s.orderedIds,
+                hasSeededMock: s.hasSeededMock, // TODO: 백엔드 연동 시 제거
             }),
             // v1(없음) → v2: 모든 section 에 kind: 'user' 채우기.
             migrate: (persisted: any, fromVersion) => {
@@ -247,6 +280,7 @@ export const useSectionsStore = create<SectionsStore>()(
             onRehydrateStorage: () => (state) => {
                 // hydrate 직후 시스템 섹션 누락 시 시드.
                 state?.ensureSystemSections();
+                state?.seedMockOnce(); // TODO: 백엔드 연동 시 제거
                 state?.setHasHydrated(true);
             },
         },
@@ -255,6 +289,8 @@ export const useSectionsStore = create<SectionsStore>()(
 
 // 첫 마운트가 hydrate 보다 빠른 경우(스토리지 비어있을 때)도 보장.
 useSectionsStore.getState().ensureSystemSections();
+// TODO: 백엔드 연동 시 제거 — mock 시드(첫 실행에서만 1회 주입).
+useSectionsStore.getState().seedMockOnce();
 
 /* ────────────────────────── selectors ─────────────────────────── */
 

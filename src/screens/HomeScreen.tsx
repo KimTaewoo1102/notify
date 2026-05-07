@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useLayoutEffect } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
+    Alert,
     FlatList,
     Pressable,
     StyleSheet,
@@ -27,6 +28,7 @@ import { EditDoneButton } from '../features/home/EditDoneButton';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
+import { RenameSectionModal } from '../features/sections/components/RenameSectionModal';
 import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
 import {
     useOrderedUserSections,
@@ -50,7 +52,12 @@ export default function HomeScreen({ navigation }: Props) {
     const sections_map = useSectionsStore(s => s.sections);
     const reorder = useSectionsStore(s => s.reorderSections);
     const removeSection = useSectionsStore(s => s.removeSection);
+    const renameSection = useSectionsStore(s => s.renameSection);
+    const toggleNotify = useSectionsStore(s => s.toggleNotify);
+    const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
     const pushToTrash = useTrashStore(s => s.pushSection);
+
+    const [renameTarget, setRenameTarget] = useState<Section | null>(null);
 
     const deleteSection = useCallback(
         (id: string) => {
@@ -60,6 +67,37 @@ export default function HomeScreen({ navigation }: Props) {
             removeSection(id);
         },
         [sections_map, pushToTrash, removeSection],
+    );
+
+    const confirmDelete = useCallback(
+        (sec: Section) => {
+            Alert.alert(
+                '섹션 삭제',
+                `"${sec.title}" 섹션을 삭제할까요?\n휴지통에서 30일간 복구할 수 있어요.`,
+                [
+                    { text: '취소', style: 'cancel' },
+                    {
+                        text: '삭제',
+                        style: 'destructive',
+                        onPress: () => {
+                            haptic('warning');
+                            deleteSection(sec.id);
+                        },
+                    },
+                ],
+            );
+        },
+        [deleteSection],
+    );
+
+    const handleRename = useCallback(
+        (next: string) => {
+            if (!renameTarget) return;
+            renameSection(renameTarget.id, next);
+            haptic('success');
+            setRenameTarget(null);
+        },
+        [renameTarget, renameSection],
     );
 
     // user 섹션이 0이 되면 자동으로 편집 모드 해제.
@@ -105,6 +143,21 @@ export default function HomeScreen({ navigation }: Props) {
                 />
             </View>
         ) : null;
+
+    // 일반(비편집) 모드에서 user 섹션 1개를 렌더하는 공통 핸들러.
+    const renderUserRow = (item: Section) => (
+        <SwipeableSectionRow onDelete={() => deleteSection(item.id)}>
+            <SectionCard
+                section={item}
+                onPress={() => onPressSection(item)}
+                onLongPress={onLongPressSection}
+                onToggleNotify={() => toggleNotify(item.id)}
+                onEditKeywords={() => openKeywordEdit(item.id)}
+                onRename={() => setRenameTarget(item)}
+                onDelete={() => confirmDelete(item)}
+            />
+        </SwipeableSectionRow>
+    );
 
     if (userSections.length === 0) {
         return (
@@ -170,19 +223,16 @@ export default function HomeScreen({ navigation }: Props) {
                     contentContainerStyle={styles.list}
                     ListHeaderComponent={renderPinHeader}
                     ListFooterComponent={renderAddSlot}
-                    renderItem={({ item }) => (
-                        <SwipeableSectionRow
-                            onDelete={() => deleteSection(item.id)}
-                        >
-                            <SectionCard
-                                section={item}
-                                onPress={() => onPressSection(item)}
-                                onLongPress={onLongPressSection}
-                            />
-                        </SwipeableSectionRow>
-                    )}
+                    renderItem={({ item }) => renderUserRow(item)}
                 />
             )}
+
+            <RenameSectionModal
+                visible={!!renameTarget}
+                initial={renameTarget?.title ?? ''}
+                onClose={() => setRenameTarget(null)}
+                onSubmit={handleRename}
+            />
         </View>
     );
 }
