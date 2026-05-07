@@ -35,6 +35,7 @@ import {
     usePinSystemSection,
     useSectionsStore,
 } from '../stores/sectionsStore';
+import { usePinnedNoticeCount } from '../stores/noticesStore';
 import { useTrashStore } from '../stores/trashStore';
 import { useUIStore } from '../stores/uiStore';
 import type { Section } from '../types/domain';
@@ -45,6 +46,7 @@ type Props = RootStackScreenProps<'Home'>;
 export default function HomeScreen({ navigation }: Props) {
     const userSections = useOrderedUserSections();
     const pinSection = usePinSystemSection();
+    const pinnedCount = usePinnedNoticeCount();
     const editMode = useUIStore(s => s.editMode);
     const setEditMode = useUIStore(s => s.setEditMode);
     const openAdd = useUIStore(s => s.openAddSection);
@@ -139,6 +141,7 @@ export default function HomeScreen({ navigation }: Props) {
             <View style={styles.pinHeader}>
                 <SectionCard
                     section={pinSection}
+                    pinnedCount={pinnedCount}
                     onPress={() => onPressSection(pinSection)}
                 />
             </View>

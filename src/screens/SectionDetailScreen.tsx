@@ -3,12 +3,14 @@ import React, {
     useEffect,
     useLayoutEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import {
     ActivityIndicator,
     Linking,
     ScrollView,
+    Share,
     StyleSheet,
     Text,
     View,
@@ -25,12 +27,20 @@ import {
     useDeletedNoticeCountForSection,
     useDeletedNoticeIdSet,
     useNoticesStore,
+    usePinnedNoticeIdSet,
+    useAllPinnedNotices,
 } from '../stores/noticesStore';
 import { SectionTrashButton } from '../features/notices/components/SectionTrashButton';
 import { SelectionActionBar } from '../features/notices/components/SelectionActionBar';
 import { NoticeBulkDeleteModal } from '../features/notices/components/NoticeBulkDeleteModal';
+import {
+    NoticeContextMenu,
+    type NoticeMenuAnchor,
+    type NoticeMenuItem,
+} from '../features/notices/components/NoticeContextMenu';
 import { uosAdapter } from '../services/universities/uos';
 import type { Notice, ID } from '../types/domain';
+import { SYSTEM_PIN_SECTION_ID } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'SectionDetail'>;
@@ -45,6 +55,9 @@ const CATEGORY_LABEL: Record<string, string> = {
     general: '일반',
 };
 
+/** 노란색 핀 — 시스템 '고정' 섹션과 동일한 톤. */
+const PIN_COLOR = colors.warning;
+
 function timeAgo(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
     const hours = Math.floor(diff / (60 * 60 * 1000));
@@ -53,37 +66,68 @@ function timeAgo(iso: string): string {
     return `${Math.floor(hours / 24)}일 전`;
 }
 
+async function shareNotice(notice: Notice) {
+    try {
+        await Share.share({
+            message: `${notice.title}\n${notice.sourceUrl}`,
+            url: notice.sourceUrl,
+            title: notice.title,
+        });
+    } catch {
+        /* 사용자가 공유 시트 취소 — silent. */
+    }
+}
+
 export default function SectionDetailScreen({ navigation, route }: Props) {
     const { sectionId } = route.params;
+    const isSystemPin = sectionId === SYSTEM_PIN_SECTION_ID;
+
     const section = useSectionsStore(s => s.sections[sectionId]);
     const toggleNotify = useSectionsStore(s => s.toggleNotify);
     const togglePin = useSectionsStore(s => s.togglePin);
     const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
+
     const markManyDeleted = useNoticesStore(s => s.markManyDeleted);
+    const togglePinNotice = useNoticesStore(s => s.togglePin);
+    const unpinNotice = useNoticesStore(s => s.unpin);
     const deletedIds = useDeletedNoticeIdSet();
+    const pinnedIds = usePinnedNoticeIdSet();
+    const pinnedEntries = useAllPinnedNotices();
     const deletedCount = useDeletedNoticeCountForSection(sectionId);
 
     const [allNotices, setAllNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(false);
 
-    /* ─── 선택 모드 상태 ───────────────────────────────── */
+    /* ─── 선택 모드 ───────────────────────────────────── */
     const [selectionMode, setSelectionMode] = useState(false);
     const [selected, setSelected] = useState<Set<ID>>(new Set());
     const [confirmOpen, setConfirmOpen] = useState(false);
+
+    /* ─── Context menu (long-press) ──────────────────── */
+    const [menuTarget, setMenuTarget] = useState<{
+        notice: Notice;
+        anchor: NoticeMenuAnchor;
+    } | null>(null);
 
     const exitSelection = useCallback(() => {
         setSelectionMode(false);
         setSelected(new Set());
     }, []);
 
-    /* 휴지통에 들어간 공지는 목록에서 제외. */
-    const notices = useMemo(
-        () => allNotices.filter(n => !deletedIds.has(n.id)),
-        [allNotices, deletedIds],
+    /* 시스템 '고정' 섹션 — pinned 공지를 그대로 사용. 일반 섹션 — 어댑터 fetch. */
+    const pinnedNoticesForSystem = useMemo(
+        () => pinnedEntries.map(e => e.payload),
+        [pinnedEntries],
     );
 
-    /* 어댑터에서 fetch — 키워드 / 섹션 변경 시 갱신. */
+    const baseNotices = isSystemPin ? pinnedNoticesForSystem : allNotices;
+    const notices = useMemo(
+        () => baseNotices.filter(n => !deletedIds.has(n.id)),
+        [baseNotices, deletedIds],
+    );
+
     const fetchNotices = useCallback(async () => {
+        if (isSystemPin) return; // pinned source 는 store 에서 직접 옴
         if (!section || section.keywords.length === 0) {
             setAllNotices([]);
             return;
@@ -97,23 +141,25 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [section]);
+    }, [section, isSystemPin]);
 
     useEffect(() => {
         fetchNotices();
     }, [fetchNotices]);
 
-    /* 보이는 공지가 모두 사라지면 선택 모드 자동 종료. */
     useEffect(() => {
         if (selectionMode && notices.length === 0) exitSelection();
     }, [selectionMode, notices.length, exitSelection]);
 
-    /* 헤더 — 선택 모드일 땐 카운트, 평소엔 휴지통 진입 버튼. */
     useLayoutEffect(() => {
         navigation.setOptions({
-            title: selectionMode ? `${selected.size}개 선택` : section?.title ?? '',
+            title: selectionMode
+                ? `${selected.size}개 선택`
+                : isSystemPin
+                ? '고정'
+                : section?.title ?? '',
             headerRight: () =>
-                selectionMode ? null : (
+                selectionMode || isSystemPin ? null : (
                     <SectionTrashButton
                         count={deletedCount}
                         onPress={() => navigation.navigate('Trash')}
@@ -126,9 +172,10 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         selectionMode,
         selected.size,
         deletedCount,
+        isSystemPin,
     ]);
 
-    /* ─── 선택 토글 / 진입 ─────────────────────────────── */
+    /* ─── 선택 토글 ───────────────────────────────────── */
     const toggleSelected = useCallback((id: ID) => {
         setSelected(prev => {
             const next = new Set(prev);
@@ -136,12 +183,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
             else next.add(id);
             return next;
         });
-    }, []);
-
-    const enterSelectionWith = useCallback((id: ID) => {
-        haptic('medium');
-        setSelectionMode(true);
-        setSelected(new Set([id]));
     }, []);
 
     const onPressNotice = useCallback(
@@ -157,26 +198,99 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         [selectionMode, toggleSelected],
     );
 
+    /* ─── Context menu trigger ───────────────────────── */
     const onLongPressNotice = useCallback(
-        (n: Notice) => {
+        (notice: Notice, anchor: NoticeMenuAnchor) => {
             if (selectionMode) return;
-            enterSelectionWith(n.id);
+            haptic('medium');
+            setMenuTarget({ notice, anchor });
         },
-        [selectionMode, enterSelectionWith],
+        [selectionMode],
     );
 
-    /* ─── Bulk delete 확정 ─────────────────────────────── */
+    const closeMenu = useCallback(() => setMenuTarget(null), []);
+
+    /* ─── Bulk delete ─────────────────────────────────── */
     const confirmDelete = useCallback(() => {
-        const targets = allNotices.filter(n => selected.has(n.id));
+        const targets = baseNotices.filter(n => selected.has(n.id));
         if (targets.length === 0) {
             setConfirmOpen(false);
             return;
         }
-        markManyDeleted(targets, sectionId);
+        const sourceSectionId = isSystemPin ? SYSTEM_PIN_SECTION_ID : sectionId;
+        markManyDeleted(targets, sourceSectionId);
         haptic('success');
         setConfirmOpen(false);
         exitSelection();
-    }, [allNotices, selected, markManyDeleted, sectionId, exitSelection]);
+    }, [
+        baseNotices,
+        selected,
+        markManyDeleted,
+        sectionId,
+        isSystemPin,
+        exitSelection,
+    ]);
+
+    /* ─── Context menu items ──────────────────────────── */
+    const menuItems: NoticeMenuItem[] = useMemo(() => {
+        if (!menuTarget) return [];
+        const notice = menuTarget.notice;
+        const isPinned = pinnedIds.has(notice.id);
+        const items: NoticeMenuItem[] = [
+            {
+                key: 'pin',
+                label: isPinned ? '고정 해제' : '고정',
+                icon: isPinned ? 'pin' : 'pin-outline',
+                iconColor: isPinned ? PIN_COLOR : colors.textSecondary,
+                onPress: () => {
+                    if (isPinned) {
+                        unpinNotice(notice.id);
+                        haptic('light');
+                    } else {
+                        togglePinNotice(notice, sectionId);
+                        haptic('success');
+                    }
+                },
+            },
+            {
+                key: 'share',
+                label: '공유',
+                icon: 'share-outline',
+                onPress: () => shareNotice(notice),
+            },
+            {
+                key: 'select',
+                label: '선택',
+                icon: 'checkmark-circle-outline',
+                onPress: () => {
+                    setSelectionMode(true);
+                    setSelected(new Set([notice.id]));
+                },
+            },
+            {
+                key: 'delete',
+                label: '휴지통으로 이동',
+                icon: 'trash',
+                destructive: true,
+                onPress: () => {
+                    const src = isSystemPin
+                        ? notice.originalSectionId ?? SYSTEM_PIN_SECTION_ID
+                        : sectionId;
+                    markManyDeleted([notice], src);
+                    haptic('warning');
+                },
+            },
+        ];
+        return items;
+    }, [
+        menuTarget,
+        pinnedIds,
+        togglePinNotice,
+        unpinNotice,
+        markManyDeleted,
+        sectionId,
+        isSystemPin,
+    ]);
 
     if (!section) {
         return (
@@ -187,6 +301,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     }
 
     const accent = section.accentColor;
+    const showSectionControls = !isSystemPin;
 
     return (
         <View style={styles.root}>
@@ -194,69 +309,111 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 {/* Summary card */}
                 <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
                     <View style={styles.summaryHead}>
-                        <View style={[styles.dot, { backgroundColor: accent }]} />
-                        <Text style={styles.summaryTitle}>{section.title}</Text>
+                        {isSystemPin ? (
+                            <Ionicons name="pin" size={16} color={accent} />
+                        ) : (
+                            <View style={[styles.dot, { backgroundColor: accent }]} />
+                        )}
+                        <Text style={styles.summaryTitle}>
+                            {isSystemPin ? '고정한 공지' : section.title}
+                        </Text>
                     </View>
                     <Text style={styles.summaryMeta}>
-                        키워드 {section.keywords.length} · {section.universityId.toUpperCase()}
+                        {isSystemPin
+                            ? `${pinnedNoticesForSystem.length}개 공지 · 길게 눌러 해제`
+                            : `키워드 ${section.keywords.length} · ${section.universityId.toUpperCase()}`}
                     </Text>
                 </Card>
 
-                {/* Action pills */}
-                <View style={styles.pills}>
-                    <ActionPill
-                        icon={section.notifyOn ? 'notifications' : 'notifications-off'}
-                        label={section.notifyOn ? '알림 ON' : '알림 OFF'}
-                        accent={accent}
-                        on={section.notifyOn}
-                        onPress={() => toggleNotify(section.id)}
-                    />
-                    <ActionPill
-                        icon={section.pinned ? 'pin' : 'pin-outline'}
-                        label={section.pinned ? '고정 됨' : '고정'}
-                        accent={accent}
-                        on={section.pinned}
-                        onPress={() => togglePin(section.id)}
-                    />
-                </View>
+                {showSectionControls && (
+                    <>
+                        <View style={styles.pills}>
+                            <ActionPill
+                                icon={section.notifyOn ? 'notifications' : 'notifications-off'}
+                                label={section.notifyOn ? '알림 ON' : '알림 OFF'}
+                                accent={accent}
+                                on={section.notifyOn}
+                                onPress={() => toggleNotify(section.id)}
+                            />
+                            <ActionPill
+                                icon={section.pinned ? 'pin' : 'pin-outline'}
+                                label={section.pinned ? '고정 됨' : '고정'}
+                                accent={accent}
+                                on={section.pinned}
+                                onPress={() => togglePin(section.id)}
+                            />
+                        </View>
 
-                {/* Keyword edit button */}
-                <PressableScale
-                    onPress={() => openKeywordEdit(section.id)}
-                    hapticKind="light"
-                    style={[styles.editBtn, { borderColor: accent + '55' }]}
-                >
-                    <Ionicons name="pricetag" size={16} color={accent} />
-                    <Text style={styles.editLabel}>키워드 편집</Text>
-                    <View style={[styles.editBadge, { backgroundColor: accent + '22' }]}>
-                        <Text style={[styles.editBadgeText, { color: accent }]}>
-                            {section.keywords.length}
-                        </Text>
-                    </View>
-                </PressableScale>
+                        <PressableScale
+                            onPress={() => openKeywordEdit(section.id)}
+                            hapticKind="light"
+                            style={[styles.editBtn, { borderColor: accent + '55' }]}
+                        >
+                            <Ionicons name="pricetag" size={16} color={accent} />
+                            <Text style={styles.editLabel}>키워드 편집</Text>
+                            <View style={[styles.editBadge, { backgroundColor: accent + '22' }]}>
+                                <Text style={[styles.editBadgeText, { color: accent }]}>
+                                    {section.keywords.length}
+                                </Text>
+                            </View>
+                        </PressableScale>
+                    </>
+                )}
 
                 {/* Notices */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>관련 공지</Text>
-                        <PressableScale
-                            onPress={fetchNotices}
-                            hapticKind="light"
-                            style={styles.refreshBtn}
-                            disabled={loading}
-                        >
-                            <Ionicons
-                                name="refresh"
-                                size={15}
-                                color={loading ? colors.textDisabled : colors.textMuted}
-                            />
-                        </PressableScale>
+                        <Text style={styles.sectionTitle}>
+                            {isSystemPin ? '고정 공지' : '관련 공지'}
+                        </Text>
+                        {!isSystemPin && (
+                            <PressableScale
+                                onPress={fetchNotices}
+                                hapticKind="light"
+                                style={styles.refreshBtn}
+                                disabled={loading}
+                            >
+                                <Ionicons
+                                    name="refresh"
+                                    size={15}
+                                    color={loading ? colors.textDisabled : colors.textMuted}
+                                />
+                            </PressableScale>
+                        )}
                     </View>
 
                     {loading ? (
                         <View style={styles.loader}>
                             <ActivityIndicator color={accent} size="small" />
                         </View>
+                    ) : isSystemPin ? (
+                        notices.length === 0 ? (
+                            <View style={styles.noKeywords}>
+                                <Ionicons
+                                    name="pin-outline"
+                                    size={24}
+                                    color={colors.textMuted}
+                                />
+                                <Text style={styles.noKeywordsText}>
+                                    공지를 길게 눌러 고정하면 여기에 모입니다.
+                                </Text>
+                            </View>
+                        ) : (
+                            notices.map(notice => (
+                                <NoticeRow
+                                    key={notice.id}
+                                    notice={notice}
+                                    accent={accent}
+                                    pinned={pinnedIds.has(notice.id)}
+                                    selectionMode={selectionMode}
+                                    isSelected={selected.has(notice.id)}
+                                    onPress={() => onPressNotice(notice)}
+                                    onLongPress={(anchor) =>
+                                        onLongPressNotice(notice, anchor)
+                                    }
+                                />
+                            ))
+                        )
                     ) : section.keywords.length === 0 ? (
                         <View style={styles.noKeywords}>
                             <Ionicons
@@ -287,10 +444,13 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                                 key={notice.id}
                                 notice={notice}
                                 accent={accent}
+                                pinned={pinnedIds.has(notice.id)}
                                 selectionMode={selectionMode}
                                 isSelected={selected.has(notice.id)}
                                 onPress={() => onPressNotice(notice)}
-                                onLongPress={() => onLongPressNotice(notice)}
+                                onLongPress={(anchor) =>
+                                    onLongPressNotice(notice, anchor)
+                                }
                             />
                         ))
                     )}
@@ -310,6 +470,13 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 onClose={() => setConfirmOpen(false)}
                 onConfirm={confirmDelete}
             />
+
+            <NoticeContextMenu
+                visible={!!menuTarget}
+                anchor={menuTarget?.anchor ?? null}
+                items={menuItems}
+                onClose={closeMenu}
+            />
         </View>
     );
 }
@@ -319,6 +486,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 function NoticeRow({
     notice,
     accent,
+    pinned,
     selectionMode,
     isSelected,
     onPress,
@@ -326,94 +494,120 @@ function NoticeRow({
 }: {
     notice: Notice;
     accent: string;
+    pinned: boolean;
     selectionMode: boolean;
     isSelected: boolean;
     onPress: () => void;
-    onLongPress: () => void;
+    onLongPress: (anchor: NoticeMenuAnchor) => void;
 }) {
-    return (
-        <PressableScale
-            onPress={onPress}
-            onLongPress={onLongPress}
-            delayLongPress={320}
-            hapticKind={null}
-            scaleTo={0.985}
-            style={[
-                styles.noticeCard,
-                selectionMode && isSelected && {
-                    borderColor: accent,
-                    backgroundColor: accent + '14',
-                },
-            ]}
-        >
-            {selectionMode && (
-                <View
-                    style={[
-                        styles.checkbox,
-                        isSelected && {
-                            backgroundColor: accent,
-                            borderColor: accent,
-                        },
-                    ]}
-                >
-                    {isSelected && (
-                        <Ionicons name="checkmark" size={14} color="#fff" />
-                    )}
-                </View>
-            )}
+    /** 카드 위치 측정 → 컨텍스트 메뉴 anchor. */
+    const ref = useRef<View>(null);
 
-            <View style={styles.noticeBodyWrap}>
-                <View style={styles.noticeTop}>
-                    <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
-                        <Text style={[styles.tagText, { color: accent }]}>
-                            {CATEGORY_LABEL[notice.category] ?? notice.category}
+    const handleLongPress = () => {
+        ref.current?.measureInWindow((x, y, width, height) => {
+            onLongPress({ top: y, left: x, width, height });
+        });
+    };
+
+    return (
+        <View ref={ref} collapsable={false}>
+            <PressableScale
+                onPress={onPress}
+                onLongPress={handleLongPress}
+                delayLongPress={320}
+                hapticKind={null}
+                scaleTo={0.985}
+                style={[
+                    styles.noticeCard,
+                    pinned && !selectionMode && {
+                        borderColor: PIN_COLOR + '66',
+                        backgroundColor: PIN_COLOR + '0E',
+                    },
+                    selectionMode && isSelected && {
+                        borderColor: accent,
+                        backgroundColor: accent + '14',
+                    },
+                ]}
+            >
+                {selectionMode && (
+                    <View
+                        style={[
+                            styles.checkbox,
+                            isSelected && {
+                                backgroundColor: accent,
+                                borderColor: accent,
+                            },
+                        ]}
+                    >
+                        {isSelected && (
+                            <Ionicons name="checkmark" size={14} color="#fff" />
+                        )}
+                    </View>
+                )}
+
+                <View style={styles.noticeBodyWrap}>
+                    <View style={styles.noticeTop}>
+                        <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
+                            <Text style={[styles.tagText, { color: accent }]}>
+                                {CATEGORY_LABEL[notice.category] ?? notice.category}
+                            </Text>
+                        </View>
+                        {notice.isSourcePinned && (
+                            <Ionicons name="pin" size={11} color={accent} style={styles.pinIcon} />
+                        )}
+                        <Text style={styles.noticeTime}>{timeAgo(notice.publishedAt)}</Text>
+                    </View>
+
+                    <View style={styles.titleRow}>
+                        {pinned && (
+                            <Ionicons
+                                name="pin"
+                                size={13}
+                                color={PIN_COLOR}
+                                style={styles.userPinIcon}
+                            />
+                        )}
+                        <Text style={styles.noticeTitle} numberOfLines={2}>
+                            {notice.title}
                         </Text>
                     </View>
-                    {notice.isSourcePinned && (
-                        <Ionicons name="pin" size={11} color={accent} style={styles.pinIcon} />
-                    )}
-                    <Text style={styles.noticeTime}>{timeAgo(notice.publishedAt)}</Text>
-                </View>
 
-                <Text style={styles.noticeTitle} numberOfLines={2}>
-                    {notice.title}
-                </Text>
-
-                <View style={styles.noticeBottom}>
-                    <Text style={styles.noticeDept}>{notice.department}</Text>
-                    {notice.matchedKeywords && notice.matchedKeywords.length > 0 && (
-                        <View style={styles.matchedRow}>
-                            {notice.matchedKeywords.slice(0, 3).map(kw => (
-                                <View
-                                    key={kw}
-                                    style={[
-                                        styles.matchChip,
-                                        { backgroundColor: accent + '18' },
-                                    ]}
-                                >
-                                    <Text
+                    <View style={styles.noticeBottom}>
+                        <Text style={styles.noticeDept}>{notice.department}</Text>
+                        {notice.matchedKeywords && notice.matchedKeywords.length > 0 && (
+                            <View style={styles.matchedRow}>
+                                {notice.matchedKeywords.slice(0, 3).map(kw => (
+                                    <View
+                                        key={kw}
                                         style={[
-                                            styles.matchChipText,
-                                            { color: accent },
+                                            styles.matchChip,
+                                            { backgroundColor: accent + '18' },
                                         ]}
                                     >
-                                        {kw}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
-                    )}
-                    {!selectionMode && (
-                        <Ionicons
-                            name="open-outline"
-                            size={13}
-                            color={colors.textMuted}
-                            style={styles.externalIcon}
-                        />
-                    )}
+                                        <Text
+                                            style={[
+                                                styles.matchChipText,
+                                                { color: accent },
+                                            ]}
+                                        >
+                                            {kw}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                        {!selectionMode && (
+                            <Ionicons
+                                name="open-outline"
+                                size={13}
+                                color={colors.textMuted}
+                                style={styles.externalIcon}
+                            />
+                        )}
+                    </View>
                 </View>
-            </View>
-        </PressableScale>
+            </PressableScale>
+        </View>
     );
 }
 
@@ -577,6 +771,8 @@ const styles = StyleSheet.create({
         gap: spacing.xs,
         marginBottom: 2,
     },
+    titleRow: { flexDirection: 'row', alignItems: 'flex-start' },
+    userPinIcon: { marginRight: 5, marginTop: 5 },
     tag: {
         borderRadius: radius.sm,
         paddingHorizontal: 7,
@@ -586,7 +782,12 @@ const styles = StyleSheet.create({
     pinIcon: { marginLeft: 2 },
     noticeTime: { ...typography.caption, color: colors.textMuted, marginLeft: 'auto' },
 
-    noticeTitle: { ...typography.body, color: colors.textPrimary, lineHeight: 22 },
+    noticeTitle: {
+        ...typography.body,
+        color: colors.textPrimary,
+        lineHeight: 22,
+        flex: 1,
+    },
     noticeBottom: {
         flexDirection: 'row',
         alignItems: 'center',

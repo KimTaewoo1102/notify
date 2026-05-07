@@ -6,17 +6,23 @@ import type { ID, Notice } from '../types/domain';
 import { STORAGE_PREFIX, rnStorage } from './persist/asyncStorage';
 
 /**
- * 사용자가 공지에 대해 부여한 상태 오버레이 (휴지통 / 핀 등).
+ * 사용자가 공지에 대해 부여한 상태 오버레이 (휴지통 / 핀).
  * 공지 본문은 어댑터(서버/스크레이핑)에서 오므로, 이 store 는 "어떤 공지를
- * 사용자가 어떻게 처리했는지" 만 보관한다. 휴지통에 들어간 공지는 payload
- * 스냅샷도 함께 저장 → 원본이 사라져도 휴지통/복구가 동작.
+ * 사용자가 어떻게 처리했는지" 만 보관한다. 휴지통 / 핀에 들어간 공지는 payload
+ * 스냅샷도 함께 저장 → 원본이 사라져도 표시 / 복구 / 공유가 동작.
  */
 export interface DeletedNoticeEntry {
     noticeId: ID;
     sectionId: ID;
-    /** 삭제 시점의 공지 스냅샷. 휴지통 표시 + 복구 시 사용. */
     payload: Notice;
     deletedAt: number;
+}
+
+export interface PinnedNoticeEntry {
+    noticeId: ID;
+    sectionId: ID;
+    payload: Notice;
+    pinnedAt: number;
 }
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
@@ -24,6 +30,8 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 interface NoticesState {
     /** noticeId → deleted entry. */
     deleted: Record<ID, DeletedNoticeEntry>;
+    /** noticeId → pinned entry. 사용자가 직접 고정한 공지. */
+    pinned: Record<ID, PinnedNoticeEntry>;
 }
 
 interface NoticesActions {
@@ -33,6 +41,10 @@ interface NoticesActions {
     purge: (noticeId: ID) => void;
     purgeExpired: () => void;
     purgeAll: () => void;
+
+    /** 핀 토글 — 켜질 땐 deleted 에서 자동 제거(둘 다 켜진 상태 방지). */
+    togglePin: (notice: Notice, sectionId: ID) => boolean;
+    unpin: (noticeId: ID) => void;
 }
 
 export type NoticesStore = NoticesState & NoticesActions;
@@ -41,11 +53,15 @@ export const useNoticesStore = create<NoticesStore>()(
     persist(
         (set, get) => ({
             deleted: {},
+            pinned: {},
 
             markDeleted: (notice, sectionId) =>
                 set(s => {
                     const now = Date.now();
+                    const nextPinned = { ...s.pinned };
+                    delete nextPinned[notice.id]; // 삭제 시 핀 동시 해제
                     return {
+                        pinned: nextPinned,
                         deleted: {
                             ...s.deleted,
                             [notice.id]: {
@@ -65,9 +81,11 @@ export const useNoticesStore = create<NoticesStore>()(
             markManyDeleted: (notices, sectionId) =>
                 set(s => {
                     const now = Date.now();
-                    const next = { ...s.deleted };
+                    const nextDeleted = { ...s.deleted };
+                    const nextPinned = { ...s.pinned };
                     for (const notice of notices) {
-                        next[notice.id] = {
+                        delete nextPinned[notice.id]; // 핀 동시 해제
+                        nextDeleted[notice.id] = {
                             noticeId: notice.id,
                             sectionId,
                             payload: {
@@ -78,7 +96,7 @@ export const useNoticesStore = create<NoticesStore>()(
                             deletedAt: now,
                         };
                     }
-                    return { deleted: next };
+                    return { deleted: nextDeleted, pinned: nextPinned };
                 }),
 
             restore: (noticeId) => {
@@ -111,26 +129,74 @@ export const useNoticesStore = create<NoticesStore>()(
                 }),
 
             purgeAll: () => set({ deleted: {} }),
+
+            togglePin: (notice, sectionId) => {
+                const isPinned = !!get().pinned[notice.id];
+                if (isPinned) {
+                    set(s => {
+                        const next = { ...s.pinned };
+                        delete next[notice.id];
+                        return { pinned: next };
+                    });
+                    return false;
+                }
+                set(s => {
+                    // 핀 시 휴지통에서도 자동 복원
+                    const nextDeleted = { ...s.deleted };
+                    delete nextDeleted[notice.id];
+                    return {
+                        deleted: nextDeleted,
+                        pinned: {
+                            ...s.pinned,
+                            [notice.id]: {
+                                noticeId: notice.id,
+                                sectionId,
+                                payload: {
+                                    ...notice,
+                                    isUserPinned: true,
+                                    userPinnedAt: Date.now(),
+                                },
+                                pinnedAt: Date.now(),
+                            },
+                        },
+                    };
+                });
+                return true;
+            },
+
+            unpin: (noticeId) =>
+                set(s => {
+                    if (!s.pinned[noticeId]) return s;
+                    const next = { ...s.pinned };
+                    delete next[noticeId];
+                    return { pinned: next };
+                }),
         }),
         {
             name: STORAGE_PREFIX + 'notices',
             storage: rnStorage,
-            version: 1,
-            partialize: (s) => ({ deleted: s.deleted }),
+            version: 2,
+            partialize: (s) => ({ deleted: s.deleted, pinned: s.pinned }),
+            // v1 → v2: pinned 필드 추가.
+            migrate: (persisted: any, fromVersion) => {
+                if (!persisted) return persisted;
+                if (fromVersion < 2) {
+                    return { ...persisted, pinned: persisted.pinned ?? {} };
+                }
+                return persisted;
+            },
         },
     ),
 );
 
-/* ─────────────────────── selectors ─────────────────────── */
+/* ─────────────────────── selectors: deleted ─────────────────────── */
 
-/** 빠른 lookup용 — 공지 목록을 필터링할 때 사용. */
 export function useDeletedNoticeIdSet(): Set<ID> {
     return useNoticesStore(
         useShallow((s) => new Set(Object.keys(s.deleted))),
     );
 }
 
-/** 섹션 헤더 배지 — 해당 섹션에서 삭제된 공지 수. */
 export function useDeletedNoticeCountForSection(sectionId: ID): number {
     return useNoticesStore(
         (s) =>
@@ -139,11 +205,32 @@ export function useDeletedNoticeCountForSection(sectionId: ID): number {
     );
 }
 
-/** TrashScreen 통합 목록 — 모든 삭제된 공지(최신 삭제 순). */
 export function useAllDeletedNotices(): DeletedNoticeEntry[] {
     return useNoticesStore(
         useShallow((s) =>
             Object.values(s.deleted).sort((a, b) => b.deletedAt - a.deletedAt),
         ),
     );
+}
+
+/* ─────────────────────── selectors: pinned ─────────────────────── */
+
+export function usePinnedNoticeIdSet(): Set<ID> {
+    return useNoticesStore(
+        useShallow((s) => new Set(Object.keys(s.pinned))),
+    );
+}
+
+/** 시스템 '고정' 섹션 — 사용자가 핀한 공지 목록(최신 핀 순). */
+export function useAllPinnedNotices(): PinnedNoticeEntry[] {
+    return useNoticesStore(
+        useShallow((s) =>
+            Object.values(s.pinned).sort((a, b) => b.pinnedAt - a.pinnedAt),
+        ),
+    );
+}
+
+/** 홈 화면 시스템 섹션 카드 — 핀 갯수 표시용. */
+export function usePinnedNoticeCount(): number {
+    return useNoticesStore((s) => Object.keys(s.pinned).length);
 }

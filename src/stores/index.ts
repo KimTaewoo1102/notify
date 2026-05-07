@@ -10,6 +10,12 @@ export {
     useDeletedNoticeIdSet,
     useDeletedNoticeCountForSection,
     useAllDeletedNotices,
+    usePinnedNoticeIdSet,
+    useAllPinnedNotices,
+    usePinnedNoticeCount,
 } from './noticesStore';
-export type { DeletedNoticeEntry } from './noticesStore';
+export type {
+    DeletedNoticeEntry,
+    PinnedNoticeEntry,
+} from './noticesStore';
 export { useUIStore } from './uiStore';

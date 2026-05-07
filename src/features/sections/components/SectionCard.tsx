@@ -42,6 +42,8 @@ interface Props {
     onToggleNotify?: () => void;
     onEditKeywords?: () => void;
     onRename?: () => void;
+    /** 시스템 '고정' 섹션 카드에서만 사용 — 핀된 공지 수. */
+    pinnedCount?: number;
 }
 
 export function SectionCard({
@@ -54,6 +56,7 @@ export function SectionCard({
     onToggleNotify,
     onEditKeywords,
     onRename,
+    pinnedCount,
 }: Props) {
     const isSystem = section.kind === 'system';
 
@@ -292,7 +295,15 @@ export function SectionCard({
                             </View>
                             <Text style={styles.meta} numberOfLines={1}>
                                 {isSystem ? (
-                                    '내가 고정한 공지'
+                                    pinnedCount && pinnedCount > 0 ? (
+                                        <>
+                                            고정 {pinnedCount}개
+                                            <Text style={styles.metaDim}> · </Text>
+                                            길게 눌러 공지 고정
+                                        </>
+                                    ) : (
+                                        '공지를 길게 눌러 고정해 보세요'
+                                    )
                                 ) : (
                                     <>
                                         키워드 {section.keywords.length}
