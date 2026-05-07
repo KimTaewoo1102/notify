@@ -1,299 +1,74 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import DraggableFlatList, {
-    type RenderItemParams,
-    ScaleDecorator,
-} from 'react-native-draggable-flatlist';
-import BottomSheet from '@gorhom/bottom-sheet';
+import React from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import ScreenBackground from '../components/layout/ScreenBackground';
-import AppHeader from '../components/layout/AppHeader';
-import SectionCard from '../components/notice/SectionCard';
-import MenuSheet from '../components/sheets/MenuSheet';
-import AddSectionSheet from '../components/sheets/AddSectionSheet';
-import KeywordEditSheet from '../components/sheets/KeywordEditSheet';
-
-import { useNotices } from '../hooks/useNotices';
-import { getUniversityAdapter } from '../services/universities';
-import { colors, spacing, typography } from '../constants/theme';
-import { haptics } from '../utils/haptics';
-import {
-    selectActiveSections,
-    useSectionsStore,
-    type Section,
-} from '../store/sectionsStore';
-import type { Notice, NoticeFeed } from '../types/notice';
+import { colors, spacing, radius, typography } from '../ui/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 
-const buildSubtitle = (
-    feed: NoticeFeed,
-    count: number,
-    keywords: string[],
-) => {
-    if (feed === 'keyword') {
-        return keywords.length === 0
-            ? '키워드를 등록하면 맞춤 공지가 나타나요'
-            : `"${keywords.join('", "')}" · ${count}건`;
-    }
-    if (feed === 'hot') return `조회수 급상승 · ${count}건`;
-    return `오늘 들어온 공지 · ${count}건`;
-};
+type Props = RootStackScreenProps<'Home'>;
 
-export default function HomeScreen({ navigation }: RootStackScreenProps<'Home'>) {
-    const [universityId] = useState('uos');
-    const adapter = useMemo(() => getUniversityAdapter(universityId), [universityId]);
-
-    const sections = useSectionsStore(selectActiveSections);
-    const keywords = useSectionsStore(s => s.keywords);
-    const reorder = useSectionsStore(s => s.reorder);
-    const moveToTrash = useSectionsStore(s => s.moveToTrash);
-    const allSections = useSectionsStore(s => s.sections);
-
-    const { today, keyword, hot, pinned, loading } = useNotices({
-        universityId,
-        keywords,
-    });
-
-    const [jiggleMode, setJiggleMode] = useState(false);
-
-    const menuRef = useRef<BottomSheet>(null);
-    const addRef = useRef<BottomSheet>(null);
-    const keywordRef = useRef<BottomSheet>(null);
-
-    const noticesByFeed: Record<NoticeFeed, Notice[]> = {
-        keyword,
-        hot,
-        today,
-    };
-
-    const enterJiggle = useCallback(() => {
-        setJiggleMode(true);
-    }, []);
-
-    const exitJiggle = useCallback(() => {
-        if (!jiggleMode) return;
-        haptics.tap();
-        setJiggleMode(false);
-    }, [jiggleMode]);
-
-    const handleReorder = useCallback(
-        (next: Section[]) => {
-            haptics.tap();
-            // 휴지통에 있는 섹션은 보존하고, 활성 섹션 순서만 교체.
-            const trashed = allSections.filter(s => !!s.trashedAt);
-            reorder([...next, ...trashed]);
-        },
-        [allSections, reorder],
-    );
-
-    const renderItem = useCallback(
-        ({ item, drag, isActive }: RenderItemParams<Section>) => {
-            const isLocked = item.isSystem === 'pinned-default';
-            const list =
-                isLocked
-                    ? pinned
-                    : noticesByFeed[item.feed] ?? [];
-            const itemSubtitle = isLocked
-                ? `고정된 공지 · ${list.length}건`
-                : buildSubtitle(item.feed, list.length, keywords);
-            return (
-                <ScaleDecorator activeScale={isLocked ? 1 : 1.04}>
-                    <View style={styles.sectionWrap}>
-                        <SectionCard
-                            title={item.title}
-                            subtitle={itemSubtitle}
-                            icon={item.icon as any}
-                            notices={list}
-                            showViews={item.showViews}
-                            alarmOn={item.alarmOn}
-                            pinned={item.pinned}
-                            jiggling={jiggleMode && !isActive && !isLocked}
-                            onTrash={isLocked ? undefined : () => moveToTrash(item.id)}
-                            onLongPress={
-                                isLocked
-                                    ? undefined
-                                    : () => {
-                                          enterJiggle();
-                                          drag();
-                                      }
-                            }
-                            onPress={() =>
-                                navigation.navigate('SectionDetail', {
-                                    sectionId: item.id,
-                                })
-                            }
-                        />
-                    </View>
-                </ScaleDecorator>
-            );
-        },
-        [
-            noticesByFeed,
-            pinned,
-            keywords,
-            jiggleMode,
-            enterJiggle,
-            moveToTrash,
-            navigation,
-        ],
-    );
-
+export default function HomeScreen({ navigation }: Props) {
     return (
-        <View style={styles.root}>
-            <ScreenBackground />
+        <SafeAreaView edges={['bottom']} style={styles.root}>
+            <ScrollView contentContainerStyle={styles.content}>
+                <Text style={styles.heading}>Step 2 — Routing skeleton</Text>
+                <Text style={styles.sub}>
+                    화면 이동만 동작하는 뼈대입니다. UI/애니메이션은 Step 3에서.
+                </Text>
 
-            <SafeAreaView style={styles.safe}>
-                <AppHeader
-                    universityName={adapter.name}
-                    onMenuPress={() => menuRef.current?.snapToIndex(0)}
-                    onBannerItemPress={sectionId =>
-                        navigation.navigate('SectionDetail', { sectionId })
+                <NavButton
+                    label="섹션 상세 (예시 sectionId=demo-1)"
+                    onPress={() =>
+                        navigation.navigate('SectionDetail', { sectionId: 'demo-1' })
                     }
                 />
+                <NavButton
+                    label="키워드 편집 (modal)"
+                    onPress={() =>
+                        navigation.navigate('KeywordEdit', { sectionId: 'demo-1' })
+                    }
+                />
+                <NavButton
+                    label="섹션 추가 (modal)"
+                    onPress={() => navigation.navigate('AddSection')}
+                />
+                <NavButton
+                    label="휴지통"
+                    onPress={() => navigation.navigate('Trash')}
+                />
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
 
-                {jiggleMode && (
-                    <View style={styles.jiggleBar}>
-                        <Text style={styles.jiggleText}>
-                            섹션을 끌어 순서를 바꾸거나 ⊖ 로 휴지통에 보내세요
-                        </Text>
-                        <Pressable
-                            onPress={exitJiggle}
-                            style={({ pressed }) => [
-                                styles.doneBtn,
-                                pressed && { opacity: 0.85 },
-                            ]}
-                        >
-                            <Text style={styles.doneLabel}>완료</Text>
-                        </Pressable>
-                    </View>
-                )}
-
-                {loading && today.length === 0 ? (
-                    <View style={styles.loader}>
-                        <ActivityIndicator color={colors.textSecondary} />
-                    </View>
-                ) : (
-                    <DraggableFlatList<Section>
-                        data={sections}
-                        keyExtractor={item => item.id}
-                        renderItem={renderItem}
-                        onDragEnd={({ data }) => handleReorder(data)}
-                        contentContainerStyle={styles.listContent}
-                        activationDistance={jiggleMode ? 5 : 20}
-                        ListFooterComponent={
-                            <Pressable
-                                onPress={() => {
-                                    haptics.tap();
-                                    addRef.current?.snapToIndex(0);
-                                }}
-                                style={({ pressed }) => [
-                                    styles.addCard,
-                                    pressed && styles.addCardPressed,
-                                ]}
-                            >
-                                <Ionicons name="add" size={20} color={colors.textPrimary} />
-                                <Text style={styles.addLabel}>섹션 추가</Text>
-                            </Pressable>
-                        }
-                    />
-                )}
-            </SafeAreaView>
-
-            <MenuSheet
-                ref={menuRef}
-                items={[
-                    {
-                        icon: 'log-in-outline',
-                        label: '로그인',
-                        onPress: () => menuRef.current?.close(),
-                    },
-                    {
-                        icon: 'school-outline',
-                        label: '학교 설정',
-                        onPress: () => menuRef.current?.close(),
-                    },
-                    {
-                        icon: 'key-outline',
-                        label: '내 키워드 설정',
-                        onPress: () => {
-                            menuRef.current?.close();
-                            setTimeout(() => keywordRef.current?.snapToIndex(0), 220);
-                        },
-                    },
-                    {
-                        icon: 'trash-outline',
-                        label: '휴지통',
-                        onPress: () => {
-                            menuRef.current?.close();
-                            setTimeout(() => navigation.navigate('Trash'), 220);
-                        },
-                    },
-                ]}
-            />
-            <AddSectionSheet ref={addRef} />
-            <KeywordEditSheet ref={keywordRef} />
-        </View>
+function NavButton({ label, onPress }: { label: string; onPress: () => void }) {
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        >
+            <Text style={styles.buttonLabel}>{label}</Text>
+        </Pressable>
     );
 }
 
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgTop },
-    safe: { flex: 1 },
-    loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    listContent: {
-        paddingHorizontal: spacing.xl,
-        paddingBottom: spacing.xxl * 2,
-        gap: spacing.lg,
-    },
-    sectionWrap: {
+    root: { flex: 1, backgroundColor: colors.bgBase },
+    content: { padding: spacing.lg, gap: spacing.md },
+    heading: { ...typography.h1, color: colors.textPrimary },
+    sub: {
+        ...typography.bodySm,
+        color: colors.textSecondary,
         marginBottom: spacing.lg,
     },
-    jiggleBar: {
-        marginHorizontal: spacing.xl,
-        marginBottom: spacing.md,
+    button: {
+        backgroundColor: colors.bgRaised,
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        paddingVertical: spacing.lg,
         paddingHorizontal: spacing.lg,
-        paddingVertical: 10,
-        borderRadius: 14,
-        backgroundColor: 'rgba(124,92,255,0.10)',
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(124,92,255,0.32)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
     },
-    jiggleText: {
-        ...typography.caption,
-        color: colors.textSecondary,
-        flex: 1,
-        fontSize: 12,
-    },
-    doneBtn: {
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: '#FFFFFF',
-    },
-    doneLabel: { ...typography.label, color: '#0A0A0C', fontSize: 12 },
-    addCard: {
-        marginTop: spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 18,
-        borderRadius: 18,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: colors.glassBorderSoft,
-        backgroundColor: 'rgba(255,255,255,0.025)',
-    },
-    addCardPressed: { opacity: 0.7, transform: [{ scale: 0.99 }] },
-    addLabel: { ...typography.label, color: colors.textPrimary, fontSize: 13 },
+    buttonPressed: { opacity: 0.7 },
+    buttonLabel: { ...typography.body, color: colors.textPrimary },
 });

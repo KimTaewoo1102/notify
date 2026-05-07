@@ -1,8 +1,13 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
 import HomeScreen from '../screens/HomeScreen';
 import SectionDetailScreen from '../screens/SectionDetailScreen';
+import KeywordEditScreen from '../screens/KeywordEditScreen';
+import AddSectionScreen from '../screens/AddSectionScreen';
 import TrashScreen from '../screens/TrashScreen';
+
+import { colors } from '../ui/theme';
 import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -11,22 +16,38 @@ export default function RootNavigator() {
     return (
         <Stack.Navigator
             screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: '#000' },
+                headerStyle: { backgroundColor: colors.bgTop },
+                headerTintColor: colors.textPrimary,
+                headerTitleStyle: { fontWeight: '600' },
+                headerShadowVisible: false,
+                contentStyle: { backgroundColor: colors.bgBase },
                 animation: 'slide_from_right',
-                animationDuration: 280,
             }}
         >
-            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{ title: 'Notify' }}
+            />
             <Stack.Screen
                 name="SectionDetail"
                 component={SectionDetailScreen}
-                options={{ animation: 'slide_from_right' }}
+                options={{ title: '' }}
+            />
+            <Stack.Screen
+                name="KeywordEdit"
+                component={KeywordEditScreen}
+                options={{ title: '키워드 편집', presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="AddSection"
+                component={AddSectionScreen}
+                options={{ title: '섹션 추가', presentation: 'modal' }}
             />
             <Stack.Screen
                 name="Trash"
                 component={TrashScreen}
-                options={{ animation: 'slide_from_bottom' }}
+                options={{ title: '휴지통' }}
             />
         </Stack.Navigator>
     );
