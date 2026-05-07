@@ -3,8 +3,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import HomeScreen from '../screens/HomeScreen';
 import SectionDetailScreen from '../screens/SectionDetailScreen';
-import KeywordEditScreen from '../screens/KeywordEditScreen';
-import AddSectionScreen from '../screens/AddSectionScreen';
 import TrashScreen from '../screens/TrashScreen';
 
 import { colors } from '../ui/theme';
@@ -33,16 +31,6 @@ export default function RootNavigator() {
                 name="SectionDetail"
                 component={SectionDetailScreen}
                 options={{ title: '' }}
-            />
-            <Stack.Screen
-                name="KeywordEdit"
-                component={KeywordEditScreen}
-                options={{ title: '키워드 편집', presentation: 'modal' }}
-            />
-            <Stack.Screen
-                name="AddSection"
-                component={AddSectionScreen}
-                options={{ title: '섹션 추가', presentation: 'modal' }}
             />
             <Stack.Screen
                 name="Trash"
