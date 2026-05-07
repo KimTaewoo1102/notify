@@ -301,8 +301,6 @@ export default function HomeScreen({ navigation }: Props) {
     );
 }
 
-/* ──────────────────────────── Empty State ─────────────────────────── */
-
 /* ──────────────────── UnreadPreview ───────────────────────── */
 
 function timeAgoShort(iso: string): string {
