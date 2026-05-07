@@ -446,18 +446,23 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                             </View>
                         ) : (
                             notices.map(notice => (
-                                <NoticeRow
+                                <SwipeableNoticeRow
                                     key={notice.id}
-                                    notice={notice}
-                                    accent={accent}
-                                    pinned={pinnedIds.has(notice.id)}
-                                    selectionMode={selectionMode}
-                                    isSelected={selected.has(notice.id)}
-                                    onPress={() => onPressNotice(notice)}
-                                    onLongPress={(anchor) =>
-                                        onLongPressNotice(notice, anchor)
-                                    }
-                                />
+                                    onDelete={() => deleteNotice(notice)}
+                                >
+                                    <NoticeRow
+                                        notice={notice}
+                                        accent={accent}
+                                        pinned={pinnedIds.has(notice.id)}
+                                        selectionMode={selectionMode}
+                                        isSelected={selected.has(notice.id)}
+                                        isNew={false}
+                                        onPress={() => onPressNotice(notice)}
+                                        onLongPress={(anchor) =>
+                                            onLongPressNotice(notice, anchor)
+                                        }
+                                    />
+                                </SwipeableNoticeRow>
                             ))
                         )
                     ) : section.keywords.length === 0 ? (
@@ -485,20 +490,31 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                             </Text>
                         </View>
                     ) : (
-                        notices.map(notice => (
-                            <NoticeRow
-                                key={notice.id}
-                                notice={notice}
-                                accent={accent}
-                                pinned={pinnedIds.has(notice.id)}
-                                selectionMode={selectionMode}
-                                isSelected={selected.has(notice.id)}
-                                onPress={() => onPressNotice(notice)}
-                                onLongPress={(anchor) =>
-                                    onLongPressNotice(notice, anchor)
-                                }
-                            />
-                        ))
+                        notices.map(notice => {
+                            const lv = entryLastVisitedAt.current;
+                            const isNew =
+                                lv !== null &&
+                                new Date(notice.publishedAt).getTime() > lv;
+                            return (
+                                <SwipeableNoticeRow
+                                    key={notice.id}
+                                    onDelete={() => deleteNotice(notice)}
+                                >
+                                    <NoticeRow
+                                        notice={notice}
+                                        accent={accent}
+                                        pinned={pinnedIds.has(notice.id)}
+                                        selectionMode={selectionMode}
+                                        isSelected={selected.has(notice.id)}
+                                        isNew={isNew}
+                                        onPress={() => onPressNotice(notice)}
+                                        onLongPress={(anchor) =>
+                                            onLongPressNotice(notice, anchor)
+                                        }
+                                    />
+                                </SwipeableNoticeRow>
+                            );
+                        })
                     )}
                 </View>
             </ScrollView>
@@ -535,6 +551,7 @@ function NoticeRow({
     pinned,
     selectionMode,
     isSelected,
+    isNew,
     onPress,
     onLongPress,
 }: {
@@ -543,6 +560,8 @@ function NoticeRow({
     pinned: boolean;
     selectionMode: boolean;
     isSelected: boolean;
+    /** 진입 당시 lastVisitedAt 이후 올라온 신규 공지 — accent 테두리 하이라이트. */
+    isNew: boolean;
     onPress: () => void;
     onLongPress: (anchor: NoticeMenuAnchor) => void;
 }) {
@@ -565,6 +584,11 @@ function NoticeRow({
                 scaleTo={0.985}
                 style={[
                     styles.noticeCard,
+                    // 신규 공지 — accent 컬러 테두리 하이라이트 (선택/핀 스타일보다 낮은 우선순위)
+                    isNew && !selectionMode && !pinned && {
+                        borderColor: accent + 'CC',
+                        borderWidth: 1.5,
+                    },
                     pinned && !selectionMode && {
                         borderColor: PIN_COLOR + '66',
                         backgroundColor: PIN_COLOR + '0E',
@@ -718,7 +742,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: spacing.sm,
     },
-    dot: { width: 10, height: 10, borderRadius: 5 },
     summaryTitle: { ...typography.h2, color: colors.textPrimary },
     summaryMeta: { ...typography.caption, color: colors.textSecondary },
 
