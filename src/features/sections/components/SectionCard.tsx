@@ -30,6 +30,8 @@ export function SectionCard({
     onLongPress,
     onDelete,
 }: Props) {
+    const isSystem = section.kind === 'system';
+
     // 워크릿 안에서 JS prop 직접 참조 금지 → shared value 로 미러링
     const dragScale = useSharedValue(1);
     const dragOpacity = useSharedValue(1);
@@ -54,21 +56,34 @@ export function SectionCard({
         <Animated.View style={[styles.wrapper, dragStyle]}>
             <PressableScale
                 onPress={onPress}
-                onLongPress={() => {
-                    haptic('medium');
-                    onLongPress?.();
-                }}
-                disabled={editMode}
-                hapticKind={editMode ? null : 'light'}
-                scaleTo={0.98}
+                onLongPress={
+                    isSystem
+                        ? undefined
+                        : () => {
+                              haptic('medium');
+                              onLongPress?.();
+                          }
+                }
+                disabled={editMode && !isSystem}
+                hapticKind={editMode || isSystem ? null : 'light'}
+                scaleTo={isSystem ? 0.99 : 0.98}
             >
                 <Card
                     accent={section.accentColor}
-                    showAccentLine={section.notifyOn || section.pinned}
-                    shadow={section.pinned ? 'lg' : 'md'}
+                    showAccentLine={
+                        isSystem || section.notifyOn || section.pinned
+                    }
+                    shadow={isSystem || section.pinned ? 'lg' : 'md'}
                     style={[
                         styles.card,
-                        section.pinned && {
+                        // 시스템 섹션 — 살짝 밝은 배경 + accent(노란) glow 그림자
+                        isSystem && {
+                            backgroundColor: colors.bgRaisedAlt,
+                            borderColor: section.accentColor + '33',
+                            shadowColor: section.accentColor,
+                            shadowOpacity: 0.22,
+                        },
+                        !isSystem && section.pinned && {
                             shadowColor: section.accentColor,
                             shadowOpacity: 0.35,
                         },
@@ -78,10 +93,20 @@ export function SectionCard({
                         <View
                             style={[
                                 styles.leading,
-                                { backgroundColor: section.accentColor + '22' },
+                                {
+                                    backgroundColor:
+                                        section.accentColor + (isSystem ? '2A' : '22'),
+                                },
                             ]}
                         >
-                            {section.emoji ? (
+                            {isSystem ? (
+                                <Ionicons
+                                    name="pin"
+                                    size={18}
+                                    color={section.accentColor}
+                                    style={styles.systemLeadingIcon}
+                                />
+                            ) : section.emoji ? (
                                 <Text style={styles.emoji}>{section.emoji}</Text>
                             ) : (
                                 <View
@@ -98,7 +123,7 @@ export function SectionCard({
 
                         <View style={styles.body}>
                             <View style={styles.titleRow}>
-                                {section.pinned && (
+                                {!isSystem && section.pinned && (
                                     <Ionicons
                                         name="pin"
                                         size={13}
@@ -106,18 +131,30 @@ export function SectionCard({
                                         style={styles.pinIcon}
                                     />
                                 )}
-                                <Text style={styles.title} numberOfLines={1}>
+                                <Text
+                                    style={[
+                                        styles.title,
+                                        isSystem && styles.systemTitle,
+                                    ]}
+                                    numberOfLines={1}
+                                >
                                     {section.title}
                                 </Text>
                             </View>
                             <Text style={styles.meta} numberOfLines={1}>
-                                키워드 {section.keywords.length}
-                                <Text style={styles.metaDim}> · </Text>
-                                {section.notifyOn ? '알림 ON' : '알림 OFF'}
+                                {isSystem ? (
+                                    '내가 고정한 공지'
+                                ) : (
+                                    <>
+                                        키워드 {section.keywords.length}
+                                        <Text style={styles.metaDim}> · </Text>
+                                        {section.notifyOn ? '알림 ON' : '알림 OFF'}
+                                    </>
+                                )}
                             </Text>
                         </View>
 
-                        {editMode ? (
+                        {!isSystem && editMode ? (
                             <Pressable
                                 onPress={onDelete}
                                 hitSlop={14}
@@ -130,7 +167,7 @@ export function SectionCard({
                             </Pressable>
                         ) : (
                             <View style={styles.trailing}>
-                                {section.notifyOn && (
+                                {!isSystem && section.notifyOn && (
                                     <View
                                         style={[
                                             styles.glowDot,
@@ -182,7 +219,9 @@ const styles = StyleSheet.create({
     body: { flex: 1 },
     titleRow: { flexDirection: 'row', alignItems: 'center' },
     pinIcon: { marginRight: 4 },
+    systemLeadingIcon: { marginTop: -1 },
     title: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
+    systemTitle: { letterSpacing: 0.2 },
     meta: {
         ...typography.caption,
         color: colors.textSecondary,
