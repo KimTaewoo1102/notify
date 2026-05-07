@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import SectionDetailScreen from '../screens/SectionDetailScreen';
 import TrashScreen from '../screens/TrashScreen';
+import { HeaderBanner } from '../features/home/HeaderBanner';
 
 import { colors } from '../ui/theme';
 import type { RootStackParamList } from './types';
@@ -25,7 +26,10 @@ export default function RootNavigator() {
             <Stack.Screen
                 name="Home"
                 component={HomeScreen}
-                options={{ title: 'Notify' }}
+                options={{
+                    headerTitle: () => <HeaderBanner />,
+                    headerTitleAlign: 'center',
+                }}
             />
             <Stack.Screen
                 name="SectionDetail"

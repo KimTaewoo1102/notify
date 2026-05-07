@@ -27,7 +27,8 @@ import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
 import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
 import {
-    useOrderedSections,
+    useOrderedUserSections,
+    usePinSystemSection,
     useSectionsStore,
 } from '../stores/sectionsStore';
 import { useTrashStore } from '../stores/trashStore';
@@ -38,7 +39,8 @@ import type { RootStackScreenProps } from '../navigation/types';
 type Props = RootStackScreenProps<'Home'>;
 
 export default function HomeScreen({ navigation }: Props) {
-    const sections = useOrderedSections();
+    const userSections = useOrderedUserSections();
+    const pinSection = usePinSystemSection();
     const editMode = useUIStore(s => s.editMode);
     const setEditMode = useUIStore(s => s.setEditMode);
     const openAdd = useUIStore(s => s.openAddSection);
@@ -51,21 +53,22 @@ export default function HomeScreen({ navigation }: Props) {
     const deleteSection = useCallback(
         (id: string) => {
             const sec = sections_map[id];
-            if (sec) pushToTrash(sec);
+            if (!sec || sec.kind === 'system') return; // 시스템 섹션 보호
+            pushToTrash(sec);
             removeSection(id);
         },
         [sections_map, pushToTrash, removeSection],
     );
 
-    // 섹션이 0이 되면 자동으로 편집 모드 해제.
+    // user 섹션이 0이 되면 자동으로 편집 모드 해제.
     useEffect(() => {
-        if (editMode && sections.length === 0) setEditMode(false);
-    }, [editMode, sections.length, setEditMode]);
+        if (editMode && userSections.length === 0) setEditMode(false);
+    }, [editMode, userSections.length, setEditMode]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () =>
-                sections.length > 0 ? (
+                userSections.length > 0 ? (
                     <Pressable
                         onPress={() => {
                             haptic('selection');
@@ -79,7 +82,7 @@ export default function HomeScreen({ navigation }: Props) {
                     </Pressable>
                 ) : null,
         });
-    }, [navigation, editMode, sections.length, setEditMode]);
+    }, [navigation, editMode, userSections.length, setEditMode]);
 
     const onPressSection = useCallback(
         (s: Section) => {
@@ -96,10 +99,29 @@ export default function HomeScreen({ navigation }: Props) {
         }
     }, [editMode, setEditMode]);
 
-    if (sections.length === 0) {
+    // 시스템 섹션은 항상 최상단에 자리하며, 편집 모드와 무관하게 jiggle/drag/'-' 가
+    // 절대 노출되지 않도록 ListHeaderComponent 슬롯에 분리해 렌더한다.
+    const renderPinHeader = () =>
+        pinSection ? (
+            <View style={styles.pinHeader}>
+                <SectionCard
+                    section={pinSection}
+                    onPress={() => onPressSection(pinSection)}
+                />
+            </View>
+        ) : null;
+
+    if (userSections.length === 0) {
         return (
             <View style={styles.root}>
-                <EmptyState onAdd={openAdd} />
+                <FlatList
+                    data={[]}
+                    keyExtractor={() => 'noop'}
+                    renderItem={null as any}
+                    contentContainerStyle={styles.list}
+                    ListHeaderComponent={renderPinHeader}
+                    ListFooterComponent={<EmptyState onAdd={openAdd} />}
+                />
             </View>
         );
     }
@@ -108,10 +130,11 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.root}>
             {editMode ? (
                 <DraggableFlatList<Section>
-                    data={sections}
+                    data={userSections}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.list}
                     activationDistance={6}
+                    ListHeaderComponent={renderPinHeader}
                     onDragBegin={() => haptic('light')}
                     onDragEnd={({ data }) => {
                         haptic('medium');
@@ -144,9 +167,10 @@ export default function HomeScreen({ navigation }: Props) {
                 />
             ) : (
                 <FlatList
-                    data={sections}
+                    data={userSections}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.list}
+                    ListHeaderComponent={renderPinHeader}
                     renderItem={({ item }) => (
                         <SwipeableSectionRow
                             onDelete={() => deleteSection(item.id)}
@@ -262,12 +286,21 @@ const styles = StyleSheet.create({
     },
     list: { padding: spacing.lg, paddingBottom: 140 },
 
+    // 시스템 섹션 — user 영역과 시각 분리. 아래에 얇은 디바이더.
+    pinHeader: {
+        marginBottom: spacing.sm,
+        paddingBottom: spacing.sm,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.border,
+    },
+
     empty: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.xl,
         gap: spacing.lg,
+        marginTop: spacing.xxxl,
     },
     emptyOrb: {
         width: 152,

@@ -1,5 +1,10 @@
 export type ID = string;
 
+export type SectionKind = 'system' | 'user';
+
+/** 시스템 섹션의 reserved id. 영구 보장되며 사용자가 만든 섹션과 충돌하지 않는다. */
+export const SYSTEM_PIN_SECTION_ID = 'system:pin';
+
 export type NoticeCategoryId =
     | 'academic'
     | 'scholarship'
@@ -17,6 +22,8 @@ export interface Keyword {
 
 export interface Section {
     id: ID;
+    /** 'system' = 앱 디폴트(고정 섹션 등). 사용자가 삭제/이동 불가. */
+    kind: SectionKind;
     title: string;
     source: string;
     universityId: string;

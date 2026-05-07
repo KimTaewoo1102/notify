@@ -3,10 +3,30 @@ import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { ID, Keyword, Section } from '../types/domain';
+import { SYSTEM_PIN_SECTION_ID } from '../types/domain';
 import { generateId } from '../utils/id';
 import { STORAGE_PREFIX, rnStorage } from './persist/asyncStorage';
 
 const ACCENTS = ['#7C5CFF', '#5BC0FF', '#FF7C9C', '#3DDC97', '#FFC857', '#FF9E5C'];
+
+/** '고정' 시스템 섹션 시드 (앱 첫 실행 시 자동 추가, 사용자가 삭제 불가). */
+function makePinSystemSection(): Section {
+    const now = Date.now();
+    return {
+        id: SYSTEM_PIN_SECTION_ID,
+        kind: 'system',
+        title: '고정',
+        source: '',
+        universityId: 'uos',
+        accentColor: '#FFC857', // 따뜻한 옐로우 — 시각적으로 user 섹션과 분리
+        order: -1,
+        pinned: true,
+        notifyOn: false,
+        keywords: [],
+        createdAt: now,
+        updatedAt: now,
+    };
+}
 
 interface SectionsState {
     sections: Record<ID, Section>;
@@ -29,6 +49,8 @@ interface SectionsActions {
     toggleNotify: (id: ID) => void;
     addKeyword: (sectionId: ID, text: string) => void;
     removeKeyword: (sectionId: ID, keywordId: ID) => void;
+    /** 시스템 섹션이 누락된 경우(첫 실행 또는 마이그레이션 후) 자동 복구. */
+    ensureSystemSections: () => void;
     setHasHydrated: (v: boolean) => void;
 }
 
@@ -48,6 +70,7 @@ export const useSectionsStore = create<SectionsStore>()(
                 const accent = ACCENTS[idx % ACCENTS.length];
                 const section: Section = {
                     id,
+                    kind: 'user',
                     title,
                     source,
                     universityId,
@@ -69,7 +92,10 @@ export const useSectionsStore = create<SectionsStore>()(
 
             removeSection: (id) =>
                 set(s => {
-                    if (!s.sections[id]) return s;
+                    const sec = s.sections[id];
+                    if (!sec) return s;
+                    // 시스템 섹션은 절대 삭제 금지.
+                    if (sec.kind === 'system') return s;
                     const next = { ...s.sections };
                     delete next[id];
                     return {
@@ -91,6 +117,7 @@ export const useSectionsStore = create<SectionsStore>()(
                 set(s => {
                     const sec = s.sections[id];
                     if (!sec) return s;
+                    if (sec.kind === 'system') return s; // 시스템 섹션 이름 변경 금지
                     return {
                         sections: {
                             ...s.sections,
@@ -99,12 +126,29 @@ export const useSectionsStore = create<SectionsStore>()(
                     };
                 }),
 
-            reorderSections: (newOrderedIds) => set({ orderedIds: newOrderedIds }),
+            /**
+             * 사용자가 user 섹션 순서를 변경. 시스템 섹션은 ListHeaderComponent 로
+             * 분리돼 있으므로 이 배열에는 포함되지 않는다. 안전망으로 system id 가
+             * 들어와도 무시한다.
+             */
+            reorderSections: (newOrderedIds) =>
+                set(s => {
+                    const userOnly = newOrderedIds.filter(id => {
+                        const sec = s.sections[id];
+                        return sec && sec.kind !== 'system';
+                    });
+                    const systemIds = s.orderedIds.filter(id => {
+                        const sec = s.sections[id];
+                        return sec?.kind === 'system';
+                    });
+                    return { orderedIds: [...systemIds, ...userOnly] };
+                }),
 
             togglePin: (id) =>
                 set(s => {
                     const sec = s.sections[id];
                     if (!sec) return s;
+                    if (sec.kind === 'system') return s; // 시스템 섹션 pin 토글 금지
                     return {
                         sections: {
                             ...s.sections,
@@ -165,34 +209,89 @@ export const useSectionsStore = create<SectionsStore>()(
                     };
                 }),
 
+            ensureSystemSections: () =>
+                set(s => {
+                    if (s.sections[SYSTEM_PIN_SECTION_ID]) return s;
+                    const pin = makePinSystemSection();
+                    return {
+                        sections: { ...s.sections, [pin.id]: pin },
+                        // 시스템 섹션은 항상 맨 앞.
+                        orderedIds: [pin.id, ...s.orderedIds.filter(x => x !== pin.id)],
+                    };
+                }),
+
             setHasHydrated: (v) => set({ hasHydrated: v }),
         }),
         {
             name: STORAGE_PREFIX + 'sections',
             storage: rnStorage,
-            version: 1,
+            version: 2,
             partialize: (s) => ({
                 sections: s.sections,
                 orderedIds: s.orderedIds,
             }),
+            // v1(없음) → v2: 모든 section 에 kind: 'user' 채우기.
+            migrate: (persisted: any, fromVersion) => {
+                if (!persisted) return persisted;
+                if (fromVersion < 2 && persisted.sections) {
+                    const next: Record<string, Section> = {};
+                    for (const [id, raw] of Object.entries(
+                        persisted.sections as Record<string, Section>,
+                    )) {
+                        next[id] = { ...raw, kind: raw.kind ?? 'user' };
+                    }
+                    return { ...persisted, sections: next };
+                }
+                return persisted;
+            },
             onRehydrateStorage: () => (state) => {
+                // hydrate 직후 시스템 섹션 누락 시 시드.
+                state?.ensureSystemSections();
                 state?.setHasHydrated(true);
             },
         },
     ),
 );
 
-/** 화면용 정렬: pinned 먼저, 그 다음 사용자 지정 순서. */
-export function useOrderedSections(): Section[] {
+// 첫 마운트가 hydrate 보다 빠른 경우(스토리지 비어있을 때)도 보장.
+useSectionsStore.getState().ensureSystemSections();
+
+/* ────────────────────────── selectors ─────────────────────────── */
+
+/** 시스템 '고정' 섹션 (없으면 undefined — 시드 직전 한 프레임 동안만 가능). */
+export function usePinSystemSection(): Section | undefined {
+    return useSectionsStore(s => s.sections[SYSTEM_PIN_SECTION_ID]);
+}
+
+/**
+ * 사용자 섹션 정렬: pinned user 먼저, 그 다음 일반 user.
+ * 시스템 섹션은 별도 selector(usePinSystemSection)로 노출되며 이 배열에 포함되지 않는다.
+ */
+export function useOrderedUserSections(): Section[] {
+    return useSectionsStore(
+        useShallow((s) => {
+            const list = s.orderedIds
+                .map(id => s.sections[id])
+                .filter((x): x is Section => Boolean(x) && x.kind === 'user');
+            return [
+                ...list.filter(x => x.pinned),
+                ...list.filter(x => !x.pinned),
+            ];
+        }),
+    );
+}
+
+/** 헤더 배너 등에서 "현재 보이는 섹션 전체" 가 필요할 때 사용 (system 포함). */
+export function useAllOrderedSections(): Section[] {
     return useSectionsStore(
         useShallow((s) => {
             const list = s.orderedIds
                 .map(id => s.sections[id])
                 .filter((x): x is Section => Boolean(x));
-            return [
-                ...list.filter(x => x.pinned),
-                ...list.filter(x => !x.pinned),
-            ];
+            const system = list.filter(x => x.kind === 'system');
+            const userPinned = list.filter(x => x.kind === 'user' && x.pinned);
+            const userRest = list.filter(x => x.kind === 'user' && !x.pinned);
+            return [...system, ...userPinned, ...userRest];
         }),
     );
 }
