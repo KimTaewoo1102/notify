@@ -38,7 +38,7 @@ export function SwipeableSectionRow({ onDelete, children }: Props) {
         .activeOffsetX([-12, 999])
         .failOffsetY([-14, 14])
         .onUpdate((e) => {
-            'worklet';
+            // RNGH 2.x + Reanimated 4.x: 콜백은 이미 자동 워크릿화됨 → 지시자 불필요
             const dx = Math.min(0, e.translationX);
             const overshoot = Math.max(0, -dx - ACTION_WIDTH);
             translateX.value = -Math.min(-dx, ACTION_WIDTH + overshoot * RUBBER);
@@ -50,7 +50,6 @@ export function SwipeableSectionRow({ onDelete, children }: Props) {
             }
         })
         .onEnd(() => {
-            'worklet';
             if (-translateX.value > TRIGGER) {
                 runOnJS(haptic)('medium');
                 translateX.value = withTiming(-600, { duration: 220 }, (finished) => {
