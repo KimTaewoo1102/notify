@@ -183,19 +183,21 @@ export default function HomeScreen({ navigation }: Props) {
         ) : null;
 
     // 일반(비편집) 모드에서 user 섹션 1개를 렌더하는 공통 핸들러.
-    // unreadCount/previewSlot은 캐시된 notices에서 lastVisitedAt 기준으로 계산.
     const renderUserRow = (item: Section) => {
-        const cached = noticeCache[item.id] ?? [];
         const lv = item.lastVisitedAt;
-        const unreadNotices = lv === null
-            ? []
-            : cached.filter(
-                n => !deletedIds.has(n.id) && new Date(n.publishedAt).getTime() > lv,
-            );
-        const unread = unreadNotices.length;
+        const allVisible = (noticeCache[item.id] ?? []).filter(
+            n => !deletedIds.has(n.id),
+        );
 
-        // 최신 2개만 미리보기로 표시 (최신순 정렬 후 slice).
-        const previews = [...unreadNotices]
+        // 뱃지용: lastVisitedAt 이후 신규 공지 개수 (로직 유지)
+        const unread = lv === null
+            ? 0
+            : allVisible.filter(
+                n => new Date(n.publishedAt).getTime() > lv,
+            ).length;
+
+        // 미리보기: unread 무관, 전체 캐시 중 최신 2개 고정 노출
+        const previews = [...allVisible]
             .sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt))
             .slice(0, 2);
 
@@ -214,7 +216,7 @@ export default function HomeScreen({ navigation }: Props) {
                     previews.length > 0 ? (
                         <UnreadPreview
                             notices={previews}
-                            totalUnread={unread}
+                            totalCount={allVisible.length}
                             accent={item.accentColor}
                         />
                     ) : undefined
@@ -313,11 +315,12 @@ function timeAgoShort(iso: string): string {
 
 function UnreadPreview({
     notices,
-    totalUnread,
+    totalCount,
     accent,
 }: {
     notices: Notice[];
-    totalUnread: number;
+    /** 삭제되지 않은 전체 공지 수 — 2개 초과 시 '+N개 더보기' 표시. */
+    totalCount: number;
     accent: string;
 }) {
     return (
@@ -326,10 +329,7 @@ function UnreadPreview({
             <View style={previewStyles.list}>
                 {notices.map(n => (
                     <View key={n.id} style={previewStyles.row}>
-                        <Text
-                            style={previewStyles.title}
-                            numberOfLines={1}
-                        >
+                        <Text style={previewStyles.title} numberOfLines={1}>
                             {n.title}
                         </Text>
                         <Text style={previewStyles.time}>
@@ -337,9 +337,9 @@ function UnreadPreview({
                         </Text>
                     </View>
                 ))}
-                {totalUnread > 2 && (
+                {totalCount > 2 && (
                     <Text style={[previewStyles.more, { color: accent }]}>
-                        +{totalUnread - 2}개 더보기
+                        +{totalCount - 2}개 더보기
                     </Text>
                 )}
             </View>

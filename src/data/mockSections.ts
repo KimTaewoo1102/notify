@@ -16,6 +16,8 @@ import type { Section } from '../types/domain';
  */
 
 const NOW = Date.now();
+// TODO: 백엔드 연동 시 제거 — 뱃지 UI 즉시 확인용 (mock 공지 날짜 2026-05-03~ 보다 이전)
+const MOCK_LAST_VISITED = new Date('2026-05-01T00:00:00+09:00').getTime();
 
 interface MockSpec {
     id: string;
@@ -74,6 +76,6 @@ export function buildMockSections(): Section[] {
         })),
         createdAt: NOW,
         updatedAt: NOW,
-        lastVisitedAt: null,
+        lastVisitedAt: MOCK_LAST_VISITED,
     }));
 }
