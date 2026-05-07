@@ -38,10 +38,11 @@ import {
     usePinnedNoticeCount,
     useDeletedNoticeIdSet,
 } from '../stores/noticesStore';
-import { useNoticeCacheStore, useUnreadCount } from '../stores/noticeCacheStore';
+import { useNoticeCacheStore } from '../stores/noticeCacheStore';
 import { useTrashStore } from '../stores/trashStore';
 import { useUIStore } from '../stores/uiStore';
-import type { Section } from '../types/domain';
+import { uosAdapter } from '../services/universities/uos';
+import type { Notice, Section } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'Home'>;
@@ -56,6 +57,7 @@ export default function HomeScreen({ navigation }: Props) {
 
     const sections_map = useSectionsStore(s => s.sections);
     const noticeCountCache = useSectionsStore(s => s.noticeCountCache);
+    const updateNoticeCount = useSectionsStore(s => s.updateNoticeCount);
     const reorder = useSectionsStore(s => s.reorderSections);
     const removeSection = useSectionsStore(s => s.removeSection);
     const renameSection = useSectionsStore(s => s.renameSection);
@@ -64,8 +66,35 @@ export default function HomeScreen({ navigation }: Props) {
     const pushToTrash = useTrashStore(s => s.pushSection);
     const deletedIds = useDeletedNoticeIdSet();
     const noticeCache = useNoticeCacheStore(s => s.cache);
+    const setNoticeCache = useNoticeCacheStore(s => s.setCache);
 
     const [renameTarget, setRenameTarget] = useState<Section | null>(null);
+
+    /* ─── 홈 마운트 시 모든 user 섹션 공지 백그라운드 fetch ── */
+    useEffect(() => {
+        let cancelled = false;
+        async function prefetchAll() {
+            for (const sec of userSections) {
+                if (cancelled) break;
+                if (sec.keywords.length === 0) continue;
+                try {
+                    const notices = await uosAdapter.fetchByKeywords(
+                        sec.keywords.map(k => k.text),
+                    );
+                    if (!cancelled) {
+                        setNoticeCache(sec.id, notices);
+                        updateNoticeCount(sec.id, notices.length);
+                    }
+                } catch {
+                    // 개별 섹션 실패는 조용히 무시 (UX 영향 최소화)
+                }
+            }
+        }
+        prefetchAll();
+        return () => { cancelled = true; };
+        // userSections 자체가 바뀔 때(섹션 추가/삭제)만 재실행.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userSections.map(s => s.id).join(','), setNoticeCache, updateNoticeCount]);
 
     const deleteSection = useCallback(
         (id: string) => {
@@ -154,15 +183,22 @@ export default function HomeScreen({ navigation }: Props) {
         ) : null;
 
     // 일반(비편집) 모드에서 user 섹션 1개를 렌더하는 공통 핸들러.
-    // unreadCount는 캐시된 notices에서 lastVisitedAt 기준으로 계산.
+    // unreadCount/previewSlot은 캐시된 notices에서 lastVisitedAt 기준으로 계산.
     const renderUserRow = (item: Section) => {
         const cached = noticeCache[item.id] ?? [];
         const lv = item.lastVisitedAt;
-        const unread = lv === null
-            ? 0
+        const unreadNotices = lv === null
+            ? []
             : cached.filter(
                 n => !deletedIds.has(n.id) && new Date(n.publishedAt).getTime() > lv,
-            ).length;
+            );
+        const unread = unreadNotices.length;
+
+        // 최신 2개만 미리보기로 표시 (최신순 정렬 후 slice).
+        const previews = [...unreadNotices]
+            .sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt))
+            .slice(0, 2);
+
         return (
             <SectionCard
                 section={item}
@@ -174,6 +210,15 @@ export default function HomeScreen({ navigation }: Props) {
                 onEditKeywords={() => openKeywordEdit(item.id)}
                 onRename={() => setRenameTarget(item)}
                 onDelete={() => confirmDelete(item)}
+                previewSlot={
+                    previews.length > 0 ? (
+                        <UnreadPreview
+                            notices={previews}
+                            totalUnread={unread}
+                            accent={item.accentColor}
+                        />
+                    ) : undefined
+                }
             />
         );
     };
@@ -255,6 +300,99 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
     );
 }
+
+/* ──────────────────────────── Empty State ─────────────────────────── */
+
+/* ──────────────────── UnreadPreview ───────────────────────── */
+
+function timeAgoShort(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const hours = Math.floor(diff / (60 * 60 * 1000));
+    if (hours < 1) return '방금';
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+}
+
+function UnreadPreview({
+    notices,
+    totalUnread,
+    accent,
+}: {
+    notices: Notice[];
+    totalUnread: number;
+    accent: string;
+}) {
+    return (
+        <View style={previewStyles.container}>
+            <View style={[previewStyles.bar, { backgroundColor: accent + '55' }]} />
+            <View style={previewStyles.list}>
+                {notices.map(n => (
+                    <View key={n.id} style={previewStyles.row}>
+                        <Text
+                            style={previewStyles.title}
+                            numberOfLines={1}
+                        >
+                            {n.title}
+                        </Text>
+                        <Text style={previewStyles.time}>
+                            {timeAgoShort(n.publishedAt)}
+                        </Text>
+                    </View>
+                ))}
+                {totalUnread > 2 && (
+                    <Text style={[previewStyles.more, { color: accent }]}>
+                        +{totalUnread - 2}개 더보기
+                    </Text>
+                )}
+            </View>
+        </View>
+    );
+}
+
+const previewStyles = StyleSheet.create({
+    container: {
+        flexDirection: 'row',
+        marginTop: 0,
+        marginHorizontal: 4,
+        backgroundColor: colors.bgRaised,
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderColor: colors.border,
+        overflow: 'hidden',
+    },
+    bar: {
+        width: 3,
+        borderBottomLeftRadius: 12,
+    },
+    list: {
+        flex: 1,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        gap: 6,
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    title: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        flex: 1,
+    },
+    time: {
+        ...typography.caption,
+        color: colors.textMuted,
+        fontSize: 11,
+    },
+    more: {
+        ...typography.caption,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+});
 
 /* ──────────────────────────── Empty State ─────────────────────────── */
 
