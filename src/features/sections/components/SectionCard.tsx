@@ -30,18 +30,24 @@ export function SectionCard({
     onLongPress,
     onDelete,
 }: Props) {
+    // 워크릿 안에서 JS prop 직접 참조 금지 → shared value 로 미러링
     const dragScale = useSharedValue(1);
+    const dragOpacity = useSharedValue(1);
 
     useEffect(() => {
         dragScale.value = withSpring(isDragActive ? 1.04 : 1, {
             damping: 14,
             stiffness: 200,
         });
-    }, [isDragActive, dragScale]);
+        dragOpacity.value = withSpring(isDragActive ? 0.96 : 1, {
+            damping: 18,
+            stiffness: 240,
+        });
+    }, [isDragActive, dragScale, dragOpacity]);
 
     const dragStyle = useAnimatedStyle(() => ({
         transform: [{ scale: dragScale.value }],
-        opacity: isDragActive ? 0.96 : 1,
+        opacity: dragOpacity.value,
     }));
 
     return (
