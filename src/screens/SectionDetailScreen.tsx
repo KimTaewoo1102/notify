@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useState,
+} from 'react';
 import {
     ActivityIndicator,
     Linking,
@@ -15,8 +21,16 @@ import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../ui/theme';
 import { useSectionsStore } from '../stores/sectionsStore';
 import { useUIStore } from '../stores/uiStore';
+import {
+    useDeletedNoticeCountForSection,
+    useDeletedNoticeIdSet,
+    useNoticesStore,
+} from '../stores/noticesStore';
+import { SectionTrashButton } from '../features/notices/components/SectionTrashButton';
+import { SelectionActionBar } from '../features/notices/components/SelectionActionBar';
+import { NoticeBulkDeleteModal } from '../features/notices/components/NoticeBulkDeleteModal';
 import { uosAdapter } from '../services/universities/uos';
-import type { Notice } from '../types/domain';
+import type { Notice, ID } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'SectionDetail'>;
@@ -45,17 +59,33 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     const toggleNotify = useSectionsStore(s => s.toggleNotify);
     const togglePin = useSectionsStore(s => s.togglePin);
     const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
+    const markManyDeleted = useNoticesStore(s => s.markManyDeleted);
+    const deletedIds = useDeletedNoticeIdSet();
+    const deletedCount = useDeletedNoticeCountForSection(sectionId);
 
-    const [notices, setNotices] = useState<Notice[]>([]);
+    const [allNotices, setAllNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(false);
 
-    useLayoutEffect(() => {
-        navigation.setOptions({ title: section?.title ?? '' });
-    }, [navigation, section?.title]);
+    /* ─── 선택 모드 상태 ───────────────────────────────── */
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selected, setSelected] = useState<Set<ID>>(new Set());
+    const [confirmOpen, setConfirmOpen] = useState(false);
 
+    const exitSelection = useCallback(() => {
+        setSelectionMode(false);
+        setSelected(new Set());
+    }, []);
+
+    /* 휴지통에 들어간 공지는 목록에서 제외. */
+    const notices = useMemo(
+        () => allNotices.filter(n => !deletedIds.has(n.id)),
+        [allNotices, deletedIds],
+    );
+
+    /* 어댑터에서 fetch — 키워드 / 섹션 변경 시 갱신. */
     const fetchNotices = useCallback(async () => {
         if (!section || section.keywords.length === 0) {
-            setNotices([]);
+            setAllNotices([]);
             return;
         }
         setLoading(true);
@@ -63,7 +93,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
             const results = await uosAdapter.fetchByKeywords(
                 section.keywords.map(k => k.text),
             );
-            setNotices(results);
+            setAllNotices(results);
         } finally {
             setLoading(false);
         }
@@ -72,6 +102,81 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     useEffect(() => {
         fetchNotices();
     }, [fetchNotices]);
+
+    /* 보이는 공지가 모두 사라지면 선택 모드 자동 종료. */
+    useEffect(() => {
+        if (selectionMode && notices.length === 0) exitSelection();
+    }, [selectionMode, notices.length, exitSelection]);
+
+    /* 헤더 — 선택 모드일 땐 카운트, 평소엔 휴지통 진입 버튼. */
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            title: selectionMode ? `${selected.size}개 선택` : section?.title ?? '',
+            headerRight: () =>
+                selectionMode ? null : (
+                    <SectionTrashButton
+                        count={deletedCount}
+                        onPress={() => navigation.navigate('Trash')}
+                    />
+                ),
+        });
+    }, [
+        navigation,
+        section?.title,
+        selectionMode,
+        selected.size,
+        deletedCount,
+    ]);
+
+    /* ─── 선택 토글 / 진입 ─────────────────────────────── */
+    const toggleSelected = useCallback((id: ID) => {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const enterSelectionWith = useCallback((id: ID) => {
+        haptic('medium');
+        setSelectionMode(true);
+        setSelected(new Set([id]));
+    }, []);
+
+    const onPressNotice = useCallback(
+        (n: Notice) => {
+            if (selectionMode) {
+                haptic('selection');
+                toggleSelected(n.id);
+                return;
+            }
+            haptic('light');
+            Linking.openURL(n.sourceUrl).catch(() => {});
+        },
+        [selectionMode, toggleSelected],
+    );
+
+    const onLongPressNotice = useCallback(
+        (n: Notice) => {
+            if (selectionMode) return;
+            enterSelectionWith(n.id);
+        },
+        [selectionMode, enterSelectionWith],
+    );
+
+    /* ─── Bulk delete 확정 ─────────────────────────────── */
+    const confirmDelete = useCallback(() => {
+        const targets = allNotices.filter(n => selected.has(n.id));
+        if (targets.length === 0) {
+            setConfirmOpen(false);
+            return;
+        }
+        markManyDeleted(targets, sectionId);
+        haptic('success');
+        setConfirmOpen(false);
+        exitSelection();
+    }, [allNotices, selected, markManyDeleted, sectionId, exitSelection]);
 
     if (!section) {
         return (
@@ -84,106 +189,128 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     const accent = section.accentColor;
 
     return (
-        <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-            {/* Summary card */}
-            <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
-                <View style={styles.summaryHead}>
-                    <View style={[styles.dot, { backgroundColor: accent }]} />
-                    <Text style={styles.summaryTitle}>{section.title}</Text>
-                </View>
-                <Text style={styles.summaryMeta}>
-                    키워드 {section.keywords.length} · {section.universityId.toUpperCase()}
-                </Text>
-            </Card>
-
-            {/* Action pills */}
-            <View style={styles.pills}>
-                <ActionPill
-                    icon={section.notifyOn ? 'notifications' : 'notifications-off'}
-                    label={section.notifyOn ? '알림 ON' : '알림 OFF'}
-                    accent={accent}
-                    on={section.notifyOn}
-                    onPress={() => toggleNotify(section.id)}
-                />
-                <ActionPill
-                    icon={section.pinned ? 'pin' : 'pin-outline'}
-                    label={section.pinned ? '고정 됨' : '고정'}
-                    accent={accent}
-                    on={section.pinned}
-                    onPress={() => togglePin(section.id)}
-                />
-            </View>
-
-            {/* Keyword edit button */}
-            <PressableScale
-                onPress={() => openKeywordEdit(section.id)}
-                hapticKind="light"
-                style={[styles.editBtn, { borderColor: accent + '55' }]}
-            >
-                <Ionicons name="pricetag" size={16} color={accent} />
-                <Text style={styles.editLabel}>키워드 편집</Text>
-                <View style={[styles.editBadge, { backgroundColor: accent + '22' }]}>
-                    <Text style={[styles.editBadgeText, { color: accent }]}>
-                        {section.keywords.length}
+        <View style={styles.root}>
+            <ScrollView contentContainerStyle={styles.content}>
+                {/* Summary card */}
+                <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
+                    <View style={styles.summaryHead}>
+                        <View style={[styles.dot, { backgroundColor: accent }]} />
+                        <Text style={styles.summaryTitle}>{section.title}</Text>
+                    </View>
+                    <Text style={styles.summaryMeta}>
+                        키워드 {section.keywords.length} · {section.universityId.toUpperCase()}
                     </Text>
-                </View>
-            </PressableScale>
+                </Card>
 
-            {/* Notices */}
-            <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>관련 공지</Text>
-                    <PressableScale
-                        onPress={fetchNotices}
-                        hapticKind="light"
-                        style={styles.refreshBtn}
-                        disabled={loading}
-                    >
-                        <Ionicons
-                            name="refresh"
-                            size={15}
-                            color={loading ? colors.textDisabled : colors.textMuted}
-                        />
-                    </PressableScale>
+                {/* Action pills */}
+                <View style={styles.pills}>
+                    <ActionPill
+                        icon={section.notifyOn ? 'notifications' : 'notifications-off'}
+                        label={section.notifyOn ? '알림 ON' : '알림 OFF'}
+                        accent={accent}
+                        on={section.notifyOn}
+                        onPress={() => toggleNotify(section.id)}
+                    />
+                    <ActionPill
+                        icon={section.pinned ? 'pin' : 'pin-outline'}
+                        label={section.pinned ? '고정 됨' : '고정'}
+                        accent={accent}
+                        on={section.pinned}
+                        onPress={() => togglePin(section.id)}
+                    />
                 </View>
 
-                {loading ? (
-                    <View style={styles.loader}>
-                        <ActivityIndicator color={accent} size="small" />
-                    </View>
-                ) : section.keywords.length === 0 ? (
-                    <View style={styles.noKeywords}>
-                        <Ionicons
-                            name="pricetag-outline"
-                            size={24}
-                            color={colors.textMuted}
-                        />
-                        <Text style={styles.noKeywordsText}>
-                            키워드를 추가하면 관련 공지를 찾아드려요.
+                {/* Keyword edit button */}
+                <PressableScale
+                    onPress={() => openKeywordEdit(section.id)}
+                    hapticKind="light"
+                    style={[styles.editBtn, { borderColor: accent + '55' }]}
+                >
+                    <Ionicons name="pricetag" size={16} color={accent} />
+                    <Text style={styles.editLabel}>키워드 편집</Text>
+                    <View style={[styles.editBadge, { backgroundColor: accent + '22' }]}>
+                        <Text style={[styles.editBadgeText, { color: accent }]}>
+                            {section.keywords.length}
                         </Text>
                     </View>
-                ) : notices.length === 0 ? (
-                    <View style={styles.noKeywords}>
-                        <Ionicons
-                            name="search-outline"
-                            size={24}
-                            color={colors.textMuted}
-                        />
-                        <Text style={styles.noKeywordsText}>
-                            매칭되는 공지가 없습니다.
-                        </Text>
+                </PressableScale>
+
+                {/* Notices */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>관련 공지</Text>
+                        <PressableScale
+                            onPress={fetchNotices}
+                            hapticKind="light"
+                            style={styles.refreshBtn}
+                            disabled={loading}
+                        >
+                            <Ionicons
+                                name="refresh"
+                                size={15}
+                                color={loading ? colors.textDisabled : colors.textMuted}
+                            />
+                        </PressableScale>
                     </View>
-                ) : (
-                    notices.map(notice => (
-                        <NoticeRow
-                            key={notice.id}
-                            notice={notice}
-                            accent={accent}
-                        />
-                    ))
-                )}
-            </View>
-        </ScrollView>
+
+                    {loading ? (
+                        <View style={styles.loader}>
+                            <ActivityIndicator color={accent} size="small" />
+                        </View>
+                    ) : section.keywords.length === 0 ? (
+                        <View style={styles.noKeywords}>
+                            <Ionicons
+                                name="pricetag-outline"
+                                size={24}
+                                color={colors.textMuted}
+                            />
+                            <Text style={styles.noKeywordsText}>
+                                키워드를 추가하면 관련 공지를 찾아드려요.
+                            </Text>
+                        </View>
+                    ) : notices.length === 0 ? (
+                        <View style={styles.noKeywords}>
+                            <Ionicons
+                                name="search-outline"
+                                size={24}
+                                color={colors.textMuted}
+                            />
+                            <Text style={styles.noKeywordsText}>
+                                {allNotices.length > 0
+                                    ? '표시할 공지가 없습니다. (휴지통 확인)'
+                                    : '매칭되는 공지가 없습니다.'}
+                            </Text>
+                        </View>
+                    ) : (
+                        notices.map(notice => (
+                            <NoticeRow
+                                key={notice.id}
+                                notice={notice}
+                                accent={accent}
+                                selectionMode={selectionMode}
+                                isSelected={selected.has(notice.id)}
+                                onPress={() => onPressNotice(notice)}
+                                onLongPress={() => onLongPressNotice(notice)}
+                            />
+                        ))
+                    )}
+                </View>
+            </ScrollView>
+
+            <SelectionActionBar
+                visible={selectionMode}
+                selectedCount={selected.size}
+                onCancel={exitSelection}
+                onDelete={() => setConfirmOpen(true)}
+            />
+
+            <NoticeBulkDeleteModal
+                visible={confirmOpen}
+                count={selected.size}
+                onClose={() => setConfirmOpen(false)}
+                onConfirm={confirmDelete}
+            />
+        </View>
     );
 }
 
@@ -192,68 +319,99 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 function NoticeRow({
     notice,
     accent,
+    selectionMode,
+    isSelected,
+    onPress,
+    onLongPress,
 }: {
     notice: Notice;
     accent: string;
+    selectionMode: boolean;
+    isSelected: boolean;
+    onPress: () => void;
+    onLongPress: () => void;
 }) {
-    const openUrl = useCallback(() => {
-        haptic('light');
-        Linking.openURL(notice.sourceUrl).catch(() => {});
-    }, [notice.sourceUrl]);
-
     return (
         <PressableScale
-            onPress={openUrl}
+            onPress={onPress}
+            onLongPress={onLongPress}
+            delayLongPress={320}
             hapticKind={null}
             scaleTo={0.985}
-            style={styles.noticeCard}
+            style={[
+                styles.noticeCard,
+                selectionMode && isSelected && {
+                    borderColor: accent,
+                    backgroundColor: accent + '14',
+                },
+            ]}
         >
-            <View style={styles.noticeTop}>
-                <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
-                    <Text style={[styles.tagText, { color: accent }]}>
-                        {CATEGORY_LABEL[notice.category] ?? notice.category}
-                    </Text>
+            {selectionMode && (
+                <View
+                    style={[
+                        styles.checkbox,
+                        isSelected && {
+                            backgroundColor: accent,
+                            borderColor: accent,
+                        },
+                    ]}
+                >
+                    {isSelected && (
+                        <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
                 </View>
-                {notice.isSourcePinned && (
-                    <Ionicons name="pin" size={11} color={accent} style={styles.pinIcon} />
-                )}
-                <Text style={styles.noticeTime}>{timeAgo(notice.publishedAt)}</Text>
-            </View>
+            )}
 
-            <Text style={styles.noticeTitle} numberOfLines={2}>
-                {notice.title}
-            </Text>
+            <View style={styles.noticeBodyWrap}>
+                <View style={styles.noticeTop}>
+                    <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
+                        <Text style={[styles.tagText, { color: accent }]}>
+                            {CATEGORY_LABEL[notice.category] ?? notice.category}
+                        </Text>
+                    </View>
+                    {notice.isSourcePinned && (
+                        <Ionicons name="pin" size={11} color={accent} style={styles.pinIcon} />
+                    )}
+                    <Text style={styles.noticeTime}>{timeAgo(notice.publishedAt)}</Text>
+                </View>
 
-            <View style={styles.noticeBottom}>
-                <Text style={styles.noticeDept}>{notice.department}</Text>
-                {notice.matchedKeywords && notice.matchedKeywords.length > 0 && (
-                    <View style={styles.matchedRow}>
-                        {notice.matchedKeywords.slice(0, 3).map(kw => (
-                            <View
-                                key={kw}
-                                style={[
-                                    styles.matchChip,
-                                    { backgroundColor: accent + '18' },
-                                ]}
-                            >
-                                <Text
+                <Text style={styles.noticeTitle} numberOfLines={2}>
+                    {notice.title}
+                </Text>
+
+                <View style={styles.noticeBottom}>
+                    <Text style={styles.noticeDept}>{notice.department}</Text>
+                    {notice.matchedKeywords && notice.matchedKeywords.length > 0 && (
+                        <View style={styles.matchedRow}>
+                            {notice.matchedKeywords.slice(0, 3).map(kw => (
+                                <View
+                                    key={kw}
                                     style={[
-                                        styles.matchChipText,
-                                        { color: accent },
+                                        styles.matchChip,
+                                        { backgroundColor: accent + '18' },
                                     ]}
                                 >
-                                    {kw}
-                                </Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
-                <Ionicons
-                    name="open-outline"
-                    size={13}
-                    color={colors.textMuted}
-                    style={styles.externalIcon}
-                />
+                                    <Text
+                                        style={[
+                                            styles.matchChipText,
+                                            { color: accent },
+                                        ]}
+                                    >
+                                        {kw}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+                    {!selectionMode && (
+                        <Ionicons
+                            name="open-outline"
+                            size={13}
+                            color={colors.textMuted}
+                            style={styles.externalIcon}
+                        />
+                    )}
+                </View>
             </View>
         </PressableScale>
     );
@@ -306,7 +464,7 @@ function ActionPill({
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
-    content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 60 },
+    content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
     muted: {
         ...typography.body,
         color: colors.textMuted,
@@ -392,12 +550,26 @@ const styles = StyleSheet.create({
     },
 
     noticeCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.sm,
         backgroundColor: colors.bgRaised,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
         padding: spacing.md,
-        gap: spacing.xs,
+    },
+    noticeBodyWrap: { flex: 1, gap: spacing.xs },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: colors.borderStrong,
+        backgroundColor: colors.bgRaisedAlt,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
     },
     noticeTop: {
         flexDirection: 'row',

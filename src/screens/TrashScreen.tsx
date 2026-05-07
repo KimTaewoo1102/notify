@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
     Alert,
     Pressable,
@@ -15,6 +15,12 @@ import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../ui/theme';
 import { useTrashStore, type TrashEntry } from '../stores/trashStore';
 import { useSectionsStore } from '../stores/sectionsStore';
+import {
+    useAllDeletedNotices,
+    useNoticesStore,
+    type DeletedNoticeEntry,
+} from '../stores/noticesStore';
+import { SwipeToRestoreRow } from '../features/notices/components/SwipeToRestoreRow';
 
 import type { RootStackScreenProps } from '../navigation/types';
 
@@ -36,29 +42,71 @@ function timeAgo(deletedAt: number): string {
     return `${days}일 전`;
 }
 
-export default function TrashScreen({ navigation }: Props) {
-    const entries = useTrashStore(s => s.entries);
-    const restore = useTrashStore(s => s.restore);
-    const purge = useTrashStore(s => s.purge);
-    const purgeAll = useTrashStore(s => s.purgeAll);
-    const purgeExpired = useTrashStore(s => s.purgeExpired);
+/* 통합 Trash row 모델 — section 과 notice 를 하나의 리스트로 정렬해 보여준다. */
+type UnifiedRow =
+    | { kind: 'section'; deletedAt: number; entry: TrashEntry }
+    | { kind: 'notice'; deletedAt: number; entry: DeletedNoticeEntry };
+
+export default function TrashScreen({}: Props) {
+    /* sections trash */
+    const sectionEntries = useTrashStore(s => s.entries);
+    const restoreSectionEntry = useTrashStore(s => s.restore);
+    const purgeSectionEntry = useTrashStore(s => s.purge);
+    const purgeAllSections = useTrashStore(s => s.purgeAll);
+    const purgeExpiredSections = useTrashStore(s => s.purgeExpired);
     const restoreSection = useSectionsStore(s => s.restoreSection);
 
-    useEffect(() => {
-        purgeExpired();
-    }, [purgeExpired]);
+    /* notices trash */
+    const noticeEntries = useAllDeletedNotices();
+    const restoreNoticeEntry = useNoticesStore(s => s.restore);
+    const purgeNoticeEntry = useNoticesStore(s => s.purge);
+    const purgeAllNotices = useNoticesStore(s => s.purgeAll);
+    const purgeExpiredNotices = useNoticesStore(s => s.purgeExpired);
 
-    const handleRestore = useCallback(
+    useEffect(() => {
+        purgeExpiredSections();
+        purgeExpiredNotices();
+    }, [purgeExpiredSections, purgeExpiredNotices]);
+
+    /* 통합 정렬: 가장 최근에 삭제된 항목 우선. */
+    const rows: UnifiedRow[] = useMemo(() => {
+        const sectionRows: UnifiedRow[] = sectionEntries.map(e => ({
+            kind: 'section',
+            deletedAt: e.deletedAt,
+            entry: e,
+        }));
+        const noticeRows: UnifiedRow[] = noticeEntries.map(e => ({
+            kind: 'notice',
+            deletedAt: e.deletedAt,
+            entry: e,
+        }));
+        return [...sectionRows, ...noticeRows].sort(
+            (a, b) => b.deletedAt - a.deletedAt,
+        );
+    }, [sectionEntries, noticeEntries]);
+
+    const totalCount = rows.length;
+
+    /* ─── handlers ─────────────────────────────────────────── */
+    const handleRestoreSection = useCallback(
         (entry: TrashEntry) => {
-            const section = restore(entry.id);
+            const section = restoreSectionEntry(entry.id);
             if (!section) return;
             restoreSection(section);
             haptic('success');
         },
-        [restore, restoreSection],
+        [restoreSectionEntry, restoreSection],
     );
 
-    const handlePurge = useCallback(
+    const handleRestoreNotice = useCallback(
+        (entry: DeletedNoticeEntry) => {
+            restoreNoticeEntry(entry.noticeId);
+            haptic('success');
+        },
+        [restoreNoticeEntry],
+    );
+
+    const handlePurgeSection = useCallback(
         (entry: TrashEntry) => {
             Alert.alert(
                 '영구 삭제',
@@ -69,44 +117,66 @@ export default function TrashScreen({ navigation }: Props) {
                         text: '삭제',
                         style: 'destructive',
                         onPress: () => {
-                            purge(entry.id);
+                            purgeSectionEntry(entry.id);
                             haptic('warning');
                         },
                     },
                 ],
             );
         },
-        [purge],
+        [purgeSectionEntry],
+    );
+
+    const handlePurgeNotice = useCallback(
+        (entry: DeletedNoticeEntry) => {
+            Alert.alert(
+                '영구 삭제',
+                `"${entry.payload.title}" 공지를 영구 삭제할까요?\n복구할 수 없습니다.`,
+                [
+                    { text: '취소', style: 'cancel' },
+                    {
+                        text: '삭제',
+                        style: 'destructive',
+                        onPress: () => {
+                            purgeNoticeEntry(entry.noticeId);
+                            haptic('warning');
+                        },
+                    },
+                ],
+            );
+        },
+        [purgeNoticeEntry],
     );
 
     const handlePurgeAll = useCallback(() => {
-        if (entries.length === 0) return;
+        if (totalCount === 0) return;
         Alert.alert(
             '전체 영구 삭제',
-            `휴지통의 섹션 ${entries.length}개를 모두 영구 삭제할까요?`,
+            `휴지통의 항목 ${totalCount}개를 모두 영구 삭제할까요?`,
             [
                 { text: '취소', style: 'cancel' },
                 {
                     text: '모두 삭제',
                     style: 'destructive',
                     onPress: () => {
-                        purgeAll();
+                        purgeAllSections();
+                        purgeAllNotices();
                         haptic('warning');
                     },
                 },
             ],
         );
-    }, [entries.length, purgeAll]);
+    }, [totalCount, purgeAllSections, purgeAllNotices]);
 
     return (
         <View style={styles.root}>
-            {entries.length === 0 ? (
+            {totalCount === 0 ? (
                 <EmptyTrash />
             ) : (
                 <>
                     <View style={styles.topBar}>
                         <Text style={styles.hint}>
-                            30일 후 자동으로 영구 삭제됩니다.
+                            오른쪽으로 밀어 복구 · 30일 후 자동 삭제
                         </Text>
                         <Pressable onPress={handlePurgeAll} hitSlop={10}>
                             <Text style={styles.purgeAll}>전체 삭제</Text>
@@ -116,14 +186,31 @@ export default function TrashScreen({ navigation }: Props) {
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}
                     >
-                        {entries.map(entry => (
-                            <TrashCard
-                                key={entry.id}
-                                entry={entry}
-                                onRestore={() => handleRestore(entry)}
-                                onPurge={() => handlePurge(entry)}
-                            />
-                        ))}
+                        {rows.map(row =>
+                            row.kind === 'section' ? (
+                                <SwipeToRestoreRow
+                                    key={`s:${row.entry.id}`}
+                                    onRestore={() => handleRestoreSection(row.entry)}
+                                >
+                                    <SectionTrashCard
+                                        entry={row.entry}
+                                        onRestore={() => handleRestoreSection(row.entry)}
+                                        onPurge={() => handlePurgeSection(row.entry)}
+                                    />
+                                </SwipeToRestoreRow>
+                            ) : (
+                                <SwipeToRestoreRow
+                                    key={`n:${row.entry.noticeId}`}
+                                    onRestore={() => handleRestoreNotice(row.entry)}
+                                >
+                                    <NoticeTrashCard
+                                        entry={row.entry}
+                                        onRestore={() => handleRestoreNotice(row.entry)}
+                                        onPurge={() => handlePurgeNotice(row.entry)}
+                                    />
+                                </SwipeToRestoreRow>
+                            ),
+                        )}
                     </ScrollView>
                 </>
             )}
@@ -131,9 +218,9 @@ export default function TrashScreen({ navigation }: Props) {
     );
 }
 
-/* ─────────────────────── TrashCard ────────────────────────── */
+/* ─────────────────────── SectionTrashCard ───────────────────── */
 
-function TrashCard({
+function SectionTrashCard({
     entry,
     onRestore,
     onPurge,
@@ -169,10 +256,15 @@ function TrashCard({
                 </View>
 
                 <View style={styles.body}>
-                    <Text style={styles.title} numberOfLines={1}>
-                        {payload.title}
-                    </Text>
-                    <Text style={styles.meta}>
+                    <View style={styles.titleRow}>
+                        <View style={styles.kindBadge}>
+                            <Text style={styles.kindBadgeText}>섹션</Text>
+                        </View>
+                        <Text style={styles.title} numberOfLines={1}>
+                            {payload.title}
+                        </Text>
+                    </View>
+                    <Text style={styles.meta} numberOfLines={1}>
                         키워드 {payload.keywords.length}
                         <Text style={styles.metaDim}> · </Text>
                         {timeAgo(entry.deletedAt)} 삭제
@@ -183,32 +275,103 @@ function TrashCard({
                     </Text>
                 </View>
 
-                <View style={styles.actions}>
-                    <PressableScale
-                        onPress={onRestore}
-                        hapticKind="light"
-                        style={styles.restoreBtn}
-                    >
-                        <Ionicons
-                            name="arrow-undo"
-                            size={16}
-                            color={colors.success}
-                        />
-                    </PressableScale>
-                    <PressableScale
-                        onPress={onPurge}
-                        hapticKind="warning"
-                        style={styles.purgeBtn}
-                    >
-                        <Ionicons
-                            name="trash"
-                            size={16}
-                            color={colors.danger}
-                        />
-                    </PressableScale>
-                </View>
+                <CardActions onRestore={onRestore} onPurge={onPurge} />
             </View>
         </Card>
+    );
+}
+
+/* ─────────────────────── NoticeTrashCard ────────────────────── */
+
+function NoticeTrashCard({
+    entry,
+    onRestore,
+    onPurge,
+}: {
+    entry: DeletedNoticeEntry;
+    onRestore: () => void;
+    onPurge: () => void;
+}) {
+    const { payload } = entry;
+    const remaining = daysLeft(entry.deletedAt);
+    const urgent = remaining <= 3;
+
+    return (
+        <Card showAccentLine={false} shadow="md" style={styles.card}>
+            <View style={styles.cardRow}>
+                <View
+                    style={[
+                        styles.leading,
+                        { backgroundColor: colors.bgRaisedAlt },
+                    ]}
+                >
+                    <Ionicons
+                        name="document-text-outline"
+                        size={18}
+                        color={colors.textSecondary}
+                    />
+                </View>
+
+                <View style={styles.body}>
+                    <View style={styles.titleRow}>
+                        <View style={[styles.kindBadge, styles.kindBadgeNotice]}>
+                            <Text style={styles.kindBadgeText}>공지</Text>
+                        </View>
+                        <Text style={styles.title} numberOfLines={1}>
+                            {payload.title}
+                        </Text>
+                    </View>
+                    <Text style={styles.meta} numberOfLines={1}>
+                        {payload.department}
+                        <Text style={styles.metaDim}> · </Text>
+                        {timeAgo(entry.deletedAt)} 삭제
+                        <Text style={styles.metaDim}> · </Text>
+                        <Text style={urgent ? styles.metaUrgent : styles.metaDim}>
+                            {remaining}일 후 만료
+                        </Text>
+                    </Text>
+                </View>
+
+                <CardActions onRestore={onRestore} onPurge={onPurge} />
+            </View>
+        </Card>
+    );
+}
+
+/* ─────────────────────── shared actions ─────────────────────── */
+
+function CardActions({
+    onRestore,
+    onPurge,
+}: {
+    onRestore: () => void;
+    onPurge: () => void;
+}) {
+    return (
+        <View style={styles.actions}>
+            <PressableScale
+                onPress={onRestore}
+                hapticKind="light"
+                style={styles.restoreBtn}
+            >
+                <Ionicons
+                    name="arrow-undo"
+                    size={16}
+                    color={colors.success}
+                />
+            </PressableScale>
+            <PressableScale
+                onPress={onPurge}
+                hapticKind="warning"
+                style={styles.purgeBtn}
+            >
+                <Ionicons
+                    name="trash"
+                    size={16}
+                    color={colors.danger}
+                />
+            </PressableScale>
+        </View>
     );
 }
 
@@ -226,7 +389,7 @@ function EmptyTrash() {
             </View>
             <Text style={styles.emptyTitle}>휴지통이 비어 있어요</Text>
             <Text style={styles.emptySub}>
-                삭제된 섹션은 30일간 이곳에 보관됩니다.
+                삭제된 항목은 30일간 이곳에 보관됩니다.
             </Text>
         </View>
     );
@@ -246,7 +409,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
-    hint: { ...typography.caption, color: colors.textMuted },
+    hint: { ...typography.caption, color: colors.textMuted, flex: 1 },
     purgeAll: {
         ...typography.caption,
         color: colors.danger,
@@ -278,7 +441,33 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     body: { flex: 1 },
-    title: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    title: {
+        ...typography.body,
+        color: colors.textPrimary,
+        flexShrink: 1,
+    },
+    kindBadge: {
+        backgroundColor: colors.bgRaisedAlt,
+        borderWidth: 1,
+        borderColor: colors.borderStrong,
+        borderRadius: radius.sm,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    kindBadgeNotice: {
+        backgroundColor: colors.bgBase,
+    },
+    kindBadgeText: {
+        fontSize: 10,
+        color: colors.textSecondary,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
     meta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
     metaDim: { color: colors.textMuted },
     metaUrgent: { color: colors.warning, fontWeight: '600' },
