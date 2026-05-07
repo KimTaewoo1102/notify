@@ -29,13 +29,16 @@ import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
 import { RenameSectionModal } from '../features/sections/components/RenameSectionModal';
-import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
 import {
     useOrderedUserSections,
     usePinSystemSection,
     useSectionsStore,
 } from '../stores/sectionsStore';
-import { usePinnedNoticeCount } from '../stores/noticesStore';
+import {
+    usePinnedNoticeCount,
+    useDeletedNoticeIdSet,
+} from '../stores/noticesStore';
+import { useNoticeCacheStore, useUnreadCount } from '../stores/noticeCacheStore';
 import { useTrashStore } from '../stores/trashStore';
 import { useUIStore } from '../stores/uiStore';
 import type { Section } from '../types/domain';
@@ -52,12 +55,15 @@ export default function HomeScreen({ navigation }: Props) {
     const openAdd = useUIStore(s => s.openAddSection);
 
     const sections_map = useSectionsStore(s => s.sections);
+    const noticeCountCache = useSectionsStore(s => s.noticeCountCache);
     const reorder = useSectionsStore(s => s.reorderSections);
     const removeSection = useSectionsStore(s => s.removeSection);
     const renameSection = useSectionsStore(s => s.renameSection);
     const toggleNotify = useSectionsStore(s => s.toggleNotify);
     const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
     const pushToTrash = useTrashStore(s => s.pushSection);
+    const deletedIds = useDeletedNoticeIdSet();
+    const noticeCache = useNoticeCacheStore(s => s.cache);
 
     const [renameTarget, setRenameTarget] = useState<Section | null>(null);
 
@@ -148,10 +154,20 @@ export default function HomeScreen({ navigation }: Props) {
         ) : null;
 
     // 일반(비편집) 모드에서 user 섹션 1개를 렌더하는 공통 핸들러.
-    const renderUserRow = (item: Section) => (
-        <SwipeableSectionRow onDelete={() => deleteSection(item.id)}>
+    // unreadCount는 캐시된 notices에서 lastVisitedAt 기준으로 계산.
+    const renderUserRow = (item: Section) => {
+        const cached = noticeCache[item.id] ?? [];
+        const lv = item.lastVisitedAt;
+        const unread = lv === null
+            ? 0
+            : cached.filter(
+                n => !deletedIds.has(n.id) && new Date(n.publishedAt).getTime() > lv,
+            ).length;
+        return (
             <SectionCard
                 section={item}
+                totalNoticeCount={noticeCountCache[item.id]}
+                unreadCount={unread}
                 onPress={() => onPressSection(item)}
                 onLongPress={onLongPressSection}
                 onToggleNotify={() => toggleNotify(item.id)}
@@ -159,8 +175,8 @@ export default function HomeScreen({ navigation }: Props) {
                 onRename={() => setRenameTarget(item)}
                 onDelete={() => confirmDelete(item)}
             />
-        </SwipeableSectionRow>
-    );
+        );
+    };
 
     if (userSections.length === 0) {
         return (
