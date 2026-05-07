@@ -9,6 +9,7 @@ import React, {
 import {
     ActivityIndicator,
     Linking,
+    RefreshControl,
     ScrollView,
     Share,
     StyleSheet,
@@ -110,6 +111,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
     const [allNotices, setAllNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     /* ─── 선택 모드 ───────────────────────────────────── */
     const [selectionMode, setSelectionMode] = useState(false);
@@ -167,6 +169,14 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
             }
         };
     }, [sectionId, isSystemPin, markVisited]);
+
+    const onRefresh = useCallback(async () => {
+        haptic('light');
+        setIsRefreshing(true);
+        await fetchNotices();
+        setIsRefreshing(false);
+        haptic('success');
+    }, [fetchNotices]);
 
     useEffect(() => {
         fetchNotices();
@@ -342,7 +352,19 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
     return (
         <View style={styles.root}>
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    !isSystemPin ? (
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={onRefresh}
+                            tintColor={accent}
+                            colors={[accent]}
+                        />
+                    ) : undefined
+                }
+            >
                 {/* 시스템 섹션(고정)은 상단 요약 카드만 표시 */}
                 {isSystemPin && (
                     <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>

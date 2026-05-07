@@ -153,6 +153,6 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         textAlign: 'center',
         letterSpacing: 0.15,
-        marginTop: 1,
+        marginTop: 4,
     },
 });
