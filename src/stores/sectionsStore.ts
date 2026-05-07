@@ -27,6 +27,7 @@ function makePinSystemSection(): Section {
         keywords: [],
         createdAt: now,
         updatedAt: now,
+        lastVisitedAt: null,
     };
 }
 
@@ -36,6 +37,8 @@ interface SectionsState {
     hasHydrated: boolean;
     /** TODO: 백엔드 연동 시 제거 — mock 시드를 한 번만 주입하기 위한 플래그. */
     hasSeededMock: boolean;
+    /** 섹션별 공지 총 개수 캐시 (SectionDetail 진입 시 업데이트, 영구 저장). */
+    noticeCountCache: Record<ID, number>;
 }
 
 interface SectionsActions {
@@ -53,6 +56,10 @@ interface SectionsActions {
     toggleNotify: (id: ID) => void;
     addKeyword: (sectionId: ID, text: string) => void;
     removeKeyword: (sectionId: ID, keywordId: ID) => void;
+    /** 섹션 상세 화면을 떠날 때 호출 — lastVisitedAt 을 현재 시각으로 갱신. */
+    markVisited: (sectionId: ID) => void;
+    /** SectionDetail 에서 공지 fetch 완료 후 총 개수를 캐시에 저장. */
+    updateNoticeCount: (sectionId: ID, count: number) => void;
     /** 시스템 섹션이 누락된 경우(첫 실행 또는 마이그레이션 후) 자동 복구. */
     ensureSystemSections: () => void;
     /** TODO: 백엔드 연동 시 제거 — UI 검증용 mock 섹션을 한 번만 주입. */
@@ -69,6 +76,7 @@ export const useSectionsStore = create<SectionsStore>()(
             orderedIds: [],
             hasHydrated: false,
             hasSeededMock: false,
+            noticeCountCache: {},
 
             addSection: ({ title, source = '', universityId = 'uos', emoji }) => {
                 const id = generateId();
@@ -89,6 +97,7 @@ export const useSectionsStore = create<SectionsStore>()(
                     keywords: [],
                     createdAt: now,
                     updatedAt: now,
+                    lastVisitedAt: null,
                 };
                 set(s => ({
                     sections: { ...s.sections, [id]: section },
@@ -216,6 +225,26 @@ export const useSectionsStore = create<SectionsStore>()(
                     };
                 }),
 
+            markVisited: (sectionId) =>
+                set(s => {
+                    const sec = s.sections[sectionId];
+                    if (!sec) return s;
+                    return {
+                        sections: {
+                            ...s.sections,
+                            [sectionId]: {
+                                ...sec,
+                                lastVisitedAt: Date.now(),
+                            },
+                        },
+                    };
+                }),
+
+            updateNoticeCount: (sectionId, count) =>
+                set(s => ({
+                    noticeCountCache: { ...s.noticeCountCache, [sectionId]: count },
+                })),
+
             ensureSystemSections: () =>
                 set(s => {
                     if (s.sections[SYSTEM_PIN_SECTION_ID]) return s;
@@ -257,15 +286,16 @@ export const useSectionsStore = create<SectionsStore>()(
         {
             name: STORAGE_PREFIX + 'sections',
             storage: rnStorage,
-            version: 2,
+            version: 3,
             partialize: (s) => ({
                 sections: s.sections,
                 orderedIds: s.orderedIds,
                 hasSeededMock: s.hasSeededMock, // TODO: 백엔드 연동 시 제거
+                noticeCountCache: s.noticeCountCache,
             }),
-            // v1(없음) → v2: 모든 section 에 kind: 'user' 채우기.
             migrate: (persisted: any, fromVersion) => {
                 if (!persisted) return persisted;
+                // v1 → v2: 모든 section 에 kind: 'user' 채우기.
                 if (fromVersion < 2 && persisted.sections) {
                     const next: Record<string, Section> = {};
                     for (const [id, raw] of Object.entries(
@@ -273,7 +303,25 @@ export const useSectionsStore = create<SectionsStore>()(
                     )) {
                         next[id] = { ...raw, kind: raw.kind ?? 'user' };
                     }
-                    return { ...persisted, sections: next };
+                    persisted = { ...persisted, sections: next };
+                }
+                // v2 → v3: 모든 section 에 lastVisitedAt: null 채우기.
+                if (fromVersion < 3 && persisted.sections) {
+                    const next: Record<string, Section> = {};
+                    for (const [id, raw] of Object.entries(
+                        persisted.sections as Record<string, Section>,
+                    )) {
+                        next[id] = {
+                            ...raw,
+                            lastVisitedAt:
+                                (raw as any).lastVisitedAt ?? null,
+                        };
+                    }
+                    persisted = {
+                        ...persisted,
+                        sections: next,
+                        noticeCountCache: persisted.noticeCountCache ?? {},
+                    };
                 }
                 return persisted;
             },
