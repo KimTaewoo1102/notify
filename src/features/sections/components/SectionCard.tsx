@@ -38,12 +38,17 @@ interface Props {
     onPress?: () => void;
     onLongPress?: () => void;
     onDelete?: () => void;
-    /* Phase C 추가 핸들러 — 케밥 메뉴 항목용 */
     onToggleNotify?: () => void;
     onEditKeywords?: () => void;
     onRename?: () => void;
     /** 시스템 '고정' 섹션 카드에서만 사용 — 핀된 공지 수. */
     pinnedCount?: number;
+    /** 이 섹션의 전체 공지 개수 (noticeCountCache에서 조회). */
+    totalNoticeCount?: number;
+    /** 안 읽은 공지 개수 (lastVisitedAt 이후 신규 공지 수). */
+    unreadCount?: number;
+    /** 카드 아래에 렌더할 미리보기 영역 (Phase 3에서 주입). */
+    previewSlot?: React.ReactNode;
 }
 
 export function SectionCard({
@@ -57,19 +62,17 @@ export function SectionCard({
     onEditKeywords,
     onRename,
     pinnedCount,
+    totalNoticeCount,
+    unreadCount = 0,
+    previewSlot,
 }: Props) {
     const isSystem = section.kind === 'system';
 
-    /* ─── 워크릿용 SharedValue ─────────────────────────────
-     *  prop/state 를 useAnimatedStyle 안에서 직접 참조하지 않도록
-     *  모든 동적 값은 SharedValue 로만 다룬다.
-     */
     const dragScale = useSharedValue(1);
     const dragOpacity = useSharedValue(1);
     const shake = useSharedValue(0);
     const glow = useSharedValue(section.notifyOn && !isSystem ? 0.7 : 0);
 
-    /* ─── 드래그 상태 ↔ 스케일/투명도 ──────────────────── */
     useEffect(() => {
         dragScale.value = withSpring(isDragActive ? 1.04 : 1, {
             damping: 14,
@@ -81,10 +84,6 @@ export function SectionCard({
         });
     }, [isDragActive, dragScale, dragOpacity]);
 
-    /* ─── 알람 ON 펄스 Glow ──────────────────────────────
-     *  notifyOn 동안 무한 펄스, 꺼지면 cancel + fade.
-     *  시스템 섹션은 자체 정적 glow 그림자를 갖고 있어 적용하지 않음.
-     */
     useEffect(() => {
         if (isSystem) return;
         if (section.notifyOn) {
@@ -109,7 +108,6 @@ export function SectionCard({
         }
     }, [section.notifyOn, isSystem, glow]);
 
-    /* ─── 알람 OFF → ON 으로 바뀐 순간만 '부르르' + 햅틱 ── */
     const prevNotify = useRef(section.notifyOn);
     useEffect(() => {
         const wasOff = !prevNotify.current;
@@ -128,7 +126,6 @@ export function SectionCard({
         prevNotify.current = section.notifyOn;
     }, [section.notifyOn, isSystem, shake]);
 
-    /* ─── 합쳐진 wrapper transform ───────────────────────── */
     const wrapperStyle = useAnimatedStyle(() => ({
         transform: [
             { translateX: shake.value },
@@ -184,192 +181,221 @@ export function SectionCard({
         },
     ];
 
-    /* ─── 트레일링 영역(케밥 vs '-' vs chevron) 렌더링 ─── */
     const showKebab = !isSystem && !editMode;
     const showDelete = !isSystem && editMode;
 
-    return (
-        <Animated.View style={[styles.wrapper, wrapperStyle]}>
-            {/* 알람 ON 동안 펄스하는 glow ring (시스템 섹션은 미적용) */}
-            {!isSystem && (
-                <Animated.View
-                    pointerEvents="none"
-                    style={[
-                        styles.glowRing,
-                        {
-                            borderColor: section.accentColor + 'AA',
-                            shadowColor: section.accentColor,
-                        },
-                        glowStyle,
-                    ]}
+    /* ─── 좌측 leading 내용 ─────────────────────────────── */
+    const renderLeading = () => {
+        if (isSystem) {
+            return (
+                <Ionicons
+                    name="pin"
+                    size={18}
+                    color={section.accentColor}
+                    style={styles.systemLeadingIcon}
                 />
-            )}
-
-            <PressableScale
-                onPress={onPress}
-                onLongPress={
-                    isSystem
-                        ? undefined
-                        : () => {
-                              haptic('medium');
-                              onLongPress?.();
-                          }
-                }
-                disabled={editMode && !isSystem}
-                hapticKind={editMode || isSystem ? null : 'light'}
-                scaleTo={isSystem ? 0.99 : 0.98}
+            );
+        }
+        if (section.emoji) {
+            return <Text style={styles.emoji}>{section.emoji}</Text>;
+        }
+        // dot → 전체 공지 개수 숫자
+        const count = totalNoticeCount ?? null;
+        return (
+            <Text
+                style={[styles.countText, { color: section.accentColor }]}
+                numberOfLines={1}
             >
-                <Card
-                    accent={section.accentColor}
-                    showAccentLine={
-                        isSystem || section.notifyOn || section.pinned
+                {count !== null ? String(count) : '—'}
+            </Text>
+        );
+    };
+
+    /* ─── 우측 unread 뱃지 ──────────────────────────────── */
+    const showUnreadBadge = !isSystem && !editMode && unreadCount > 0;
+    const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
+
+    return (
+        <Animated.View style={[styles.outerWrapper, wrapperStyle]}>
+            {/* 카드 영역 — glowRing은 여기서만 */}
+            <View style={styles.cardWrapper}>
+                {!isSystem && (
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[
+                            styles.glowRing,
+                            {
+                                borderColor: section.accentColor + 'AA',
+                                shadowColor: section.accentColor,
+                            },
+                            glowStyle,
+                        ]}
+                    />
+                )}
+
+                <PressableScale
+                    onPress={onPress}
+                    onLongPress={
+                        isSystem
+                            ? undefined
+                            : () => {
+                                  haptic('medium');
+                                  onLongPress?.();
+                              }
                     }
-                    shadow={isSystem || section.pinned ? 'lg' : 'md'}
-                    style={[
-                        styles.card,
-                        // 시스템 섹션 — 살짝 밝은 배경 + accent 정적 glow
-                        isSystem && {
-                            backgroundColor: colors.bgRaisedAlt,
-                            borderColor: section.accentColor + '33',
-                            shadowColor: section.accentColor,
-                            shadowOpacity: 0.22,
-                        },
-                        !isSystem && section.pinned && {
-                            shadowColor: section.accentColor,
-                            shadowOpacity: 0.35,
-                        },
-                    ]}
+                    disabled={editMode && !isSystem}
+                    hapticKind={editMode || isSystem ? null : 'light'}
+                    scaleTo={isSystem ? 0.99 : 0.98}
                 >
-                    <View style={styles.row}>
-                        <View
-                            style={[
-                                styles.leading,
-                                {
-                                    backgroundColor:
-                                        section.accentColor +
-                                        (isSystem ? '2A' : '22'),
-                                },
-                            ]}
-                        >
-                            {isSystem ? (
-                                <Ionicons
-                                    name="pin"
-                                    size={18}
-                                    color={section.accentColor}
-                                    style={styles.systemLeadingIcon}
-                                />
-                            ) : section.emoji ? (
-                                <Text style={styles.emoji}>{section.emoji}</Text>
-                            ) : (
-                                <View
-                                    style={[
-                                        styles.dot,
-                                        {
-                                            backgroundColor: section.accentColor,
-                                            shadowColor: section.accentColor,
-                                        },
-                                    ]}
-                                />
-                            )}
-                        </View>
-
-                        <View style={styles.body}>
-                            <View style={styles.titleRow}>
-                                {!isSystem && section.pinned && (
-                                    <Ionicons
-                                        name="pin"
-                                        size={13}
-                                        color={section.accentColor}
-                                        style={styles.pinIcon}
-                                    />
-                                )}
-                                <Text
-                                    style={[
-                                        styles.title,
-                                        isSystem && styles.systemTitle,
-                                    ]}
-                                    numberOfLines={1}
-                                >
-                                    {section.title}
-                                </Text>
-                            </View>
-                            <Text style={styles.meta} numberOfLines={1}>
-                                {isSystem ? (
-                                    pinnedCount && pinnedCount > 0 ? (
-                                        <>
-                                            고정 {pinnedCount}개
-                                            <Text style={styles.metaDim}> · </Text>
-                                            길게 눌러 공지 고정
-                                        </>
-                                    ) : (
-                                        '공지를 길게 눌러 고정해 보세요'
-                                    )
-                                ) : (
-                                    <>
-                                        키워드 {section.keywords.length}
-                                        <Text style={styles.metaDim}> · </Text>
-                                        {section.notifyOn ? '알림 ON' : '알림 OFF'}
-                                    </>
-                                )}
-                            </Text>
-                        </View>
-
-                        {showDelete ? (
-                            <Pressable
-                                onPress={onDelete}
-                                hitSlop={14}
-                                style={({ pressed }) => [
-                                    styles.deleteBtn,
-                                    pressed && { opacity: 0.6 },
+                    <Card
+                        accent={section.accentColor}
+                        showAccentLine={
+                            isSystem || section.notifyOn || section.pinned
+                        }
+                        shadow={isSystem || section.pinned ? 'lg' : 'md'}
+                        style={[
+                            styles.card,
+                            isSystem && {
+                                backgroundColor: colors.bgRaisedAlt,
+                                borderColor: section.accentColor + '33',
+                                shadowColor: section.accentColor,
+                                shadowOpacity: 0.22,
+                            },
+                            !isSystem && section.pinned && {
+                                shadowColor: section.accentColor,
+                                shadowOpacity: 0.35,
+                            },
+                        ]}
+                    >
+                        <View style={styles.row}>
+                            <View
+                                style={[
+                                    styles.leading,
+                                    {
+                                        backgroundColor:
+                                            section.accentColor +
+                                            (isSystem ? '2A' : '22'),
+                                    },
                                 ]}
                             >
-                                <Ionicons
-                                    name="remove"
-                                    size={18}
-                                    color="#fff"
-                                />
-                            </Pressable>
-                        ) : (
-                            <View style={styles.trailing}>
-                                {!isSystem && section.notifyOn && (
-                                    <View
-                                        style={[
-                                            styles.glowDot,
-                                            {
-                                                backgroundColor: section.accentColor,
-                                                shadowColor: section.accentColor,
-                                            },
-                                        ]}
-                                    />
-                                )}
-                                {showKebab ? (
-                                    <Pressable
-                                        ref={kebabRef}
-                                        onPress={openMenu}
-                                        hitSlop={12}
-                                        style={({ pressed }) => [
-                                            styles.kebabBtn,
-                                            pressed && { opacity: 0.6 },
-                                        ]}
-                                    >
-                                        <Ionicons
-                                            name="ellipsis-vertical"
-                                            size={16}
-                                            color={colors.textSecondary}
-                                        />
-                                    </Pressable>
-                                ) : (
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={18}
-                                        color={colors.textMuted}
-                                    />
-                                )}
+                                {renderLeading()}
                             </View>
-                        )}
-                    </View>
-                </Card>
-            </PressableScale>
+
+                            <View style={styles.body}>
+                                <View style={styles.titleRow}>
+                                    {!isSystem && section.pinned && (
+                                        <Ionicons
+                                            name="pin"
+                                            size={13}
+                                            color={section.accentColor}
+                                            style={styles.pinIcon}
+                                        />
+                                    )}
+                                    <Text
+                                        style={[
+                                            styles.title,
+                                            isSystem && styles.systemTitle,
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {section.title}
+                                    </Text>
+                                </View>
+                                <Text style={styles.meta} numberOfLines={1}>
+                                    {isSystem ? (
+                                        pinnedCount && pinnedCount > 0 ? (
+                                            <>
+                                                고정 {pinnedCount}개
+                                                <Text style={styles.metaDim}> · </Text>
+                                                길게 눌러 공지 고정
+                                            </>
+                                        ) : (
+                                            '공지를 길게 눌러 고정해 보세요'
+                                        )
+                                    ) : (
+                                        <>
+                                            키워드 {section.keywords.length}
+                                            <Text style={styles.metaDim}> · </Text>
+                                            {section.notifyOn ? '알림 ON' : '알림 OFF'}
+                                        </>
+                                    )}
+                                </Text>
+                            </View>
+
+                            {showDelete ? (
+                                <Pressable
+                                    onPress={onDelete}
+                                    hitSlop={14}
+                                    style={({ pressed }) => [
+                                        styles.deleteBtn,
+                                        pressed && { opacity: 0.6 },
+                                    ]}
+                                >
+                                    <Ionicons
+                                        name="remove"
+                                        size={18}
+                                        color="#fff"
+                                    />
+                                </Pressable>
+                            ) : (
+                                <View style={styles.trailing}>
+                                    {/* 안 읽은 공지 뱃지 (카카오톡 스타일) */}
+                                    {showUnreadBadge && (
+                                        <View
+                                            style={[
+                                                styles.unreadBadge,
+                                                { backgroundColor: colors.danger },
+                                            ]}
+                                        >
+                                            <Text style={styles.unreadBadgeText}>
+                                                {badgeLabel}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {/* notifyOn 글로우 도트 */}
+                                    {!isSystem && section.notifyOn && (
+                                        <View
+                                            style={[
+                                                styles.glowDot,
+                                                {
+                                                    backgroundColor: section.accentColor,
+                                                    shadowColor: section.accentColor,
+                                                },
+                                            ]}
+                                        />
+                                    )}
+                                    {showKebab ? (
+                                        <Pressable
+                                            ref={kebabRef}
+                                            onPress={openMenu}
+                                            hitSlop={12}
+                                            style={({ pressed }) => [
+                                                styles.kebabBtn,
+                                                pressed && { opacity: 0.6 },
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                name="ellipsis-vertical"
+                                                size={16}
+                                                color={colors.textSecondary}
+                                            />
+                                        </Pressable>
+                                    ) : (
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={18}
+                                            color={colors.textMuted}
+                                        />
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    </Card>
+                </PressableScale>
+            </View>
+
+            {/* 미리보기 슬롯 — Phase 3에서 HomeScreen이 주입 */}
+            {previewSlot}
 
             <SectionCardMenu
                 visible={!!menuAnchor}
@@ -382,8 +408,9 @@ export function SectionCard({
 }
 
 const styles = StyleSheet.create({
-    wrapper: { marginVertical: 6 },
-    // 카드 둘레에 살짝 더 큰 사이즈로 떠오르는 glow ring (notifyOn 일 때 펄스).
+    outerWrapper: { marginVertical: 6 },
+    // 카드 + glowRing 만 감싸는 영역 (미리보기는 아래에 별도).
+    cardWrapper: { position: 'relative' },
     glowRing: {
         position: 'absolute',
         top: -2,
@@ -395,7 +422,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.7,
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
-        // elevation 은 Animated opacity 와 함께 펄스되도록 일부러 작게 둠.
         elevation: 4,
     },
     card: { paddingVertical: spacing.md, paddingHorizontal: spacing.md },
@@ -412,13 +438,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     emoji: { fontSize: 20 },
-    dot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        shadowOpacity: 0.7,
-        shadowRadius: 5,
-        shadowOffset: { width: 0, height: 0 },
+    // 전체 공지 개수 — dot 을 대체.
+    countText: {
+        fontSize: 15,
+        fontWeight: '700',
+        letterSpacing: -0.3,
     },
     body: { flex: 1 },
     titleRow: { flexDirection: 'row', alignItems: 'center' },
@@ -433,6 +457,21 @@ const styles = StyleSheet.create({
     },
     metaDim: { color: colors.textMuted },
     trailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    // 카카오톡 스타일 unread 뱃지.
+    unreadBadge: {
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        paddingHorizontal: 5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    unreadBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#fff',
+        lineHeight: 14,
+    },
     glowDot: {
         width: 7,
         height: 7,
