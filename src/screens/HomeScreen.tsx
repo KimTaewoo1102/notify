@@ -217,7 +217,7 @@ export default function HomeScreen({ navigation }: Props) {
                         <UnreadPreview
                             notices={previews}
                             totalCount={allVisible.length}
-                            accent={item.accentColor}
+                            accent={colors.accent}
                         />
                     ) : undefined
                 }

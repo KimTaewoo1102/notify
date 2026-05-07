@@ -22,6 +22,9 @@ import { Card } from '../../../ui/primitives/Card';
 import { PressableScale } from '../../../ui/primitives/PressableScale';
 import { haptic } from '../../../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../../../ui/theme';
+
+/** 모든 user 섹션에 동일하게 적용되는 통일 accent. 시스템 섹션은 자체 accentColor 유지. */
+const USER_ACCENT = colors.accent;
 import type { Section } from '../../../types/domain';
 import {
     SectionCardMenu,
@@ -67,6 +70,8 @@ export function SectionCard({
     previewSlot,
 }: Props) {
     const isSystem = section.kind === 'system';
+    // 시스템 섹션은 고유 accentColor(warm yellow) 유지, user 섹션은 단일 톤으로 통일.
+    const effectiveAccent = isSystem ? section.accentColor : USER_ACCENT;
 
     const dragScale = useSharedValue(1);
     const dragOpacity = useSharedValue(1);
@@ -187,23 +192,25 @@ export function SectionCard({
     /* ─── 좌측 leading 내용 ─────────────────────────────── */
     const renderLeading = () => {
         if (isSystem) {
+            // 고정 섹션도 공지 개수 숫자를 동일하게 표시 (pinnedCount 사용)
+            const count = pinnedCount ?? null;
             return (
-                <Ionicons
-                    name="pin"
-                    size={18}
-                    color={section.accentColor}
-                    style={styles.systemLeadingIcon}
-                />
+                <Text
+                    style={[styles.countText, { color: effectiveAccent }]}
+                    numberOfLines={1}
+                >
+                    {count !== null ? String(count) : '—'}
+                </Text>
             );
         }
         if (section.emoji) {
             return <Text style={styles.emoji}>{section.emoji}</Text>;
         }
-        // dot → 전체 공지 개수 숫자
+        // 전체 공지 개수 숫자
         const count = totalNoticeCount ?? null;
         return (
             <Text
-                style={[styles.countText, { color: section.accentColor }]}
+                style={[styles.countText, { color: effectiveAccent }]}
                 numberOfLines={1}
             >
                 {count !== null ? String(count) : '—'}
@@ -225,8 +232,8 @@ export function SectionCard({
                         style={[
                             styles.glowRing,
                             {
-                                borderColor: section.accentColor + 'AA',
-                                shadowColor: section.accentColor,
+                                borderColor: effectiveAccent + 'AA',
+                                shadowColor: effectiveAccent,
                             },
                             glowStyle,
                         ]}
@@ -248,7 +255,7 @@ export function SectionCard({
                     scaleTo={isSystem ? 0.99 : 0.98}
                 >
                     <Card
-                        accent={section.accentColor}
+                        accent={effectiveAccent}
                         showAccentLine={
                             isSystem || section.notifyOn || section.pinned
                         }
@@ -257,12 +264,12 @@ export function SectionCard({
                             styles.card,
                             isSystem && {
                                 backgroundColor: colors.bgRaisedAlt,
-                                borderColor: section.accentColor + '33',
-                                shadowColor: section.accentColor,
+                                borderColor: effectiveAccent + '33',
+                                shadowColor: effectiveAccent,
                                 shadowOpacity: 0.22,
                             },
                             !isSystem && section.pinned && {
-                                shadowColor: section.accentColor,
+                                shadowColor: effectiveAccent,
                                 shadowOpacity: 0.35,
                             },
                         ]}
@@ -273,7 +280,7 @@ export function SectionCard({
                                     styles.leading,
                                     {
                                         backgroundColor:
-                                            section.accentColor +
+                                            effectiveAccent +
                                             (isSystem ? '2A' : '22'),
                                     },
                                 ]}
@@ -287,7 +294,7 @@ export function SectionCard({
                                         <Ionicons
                                             name="pin"
                                             size={13}
-                                            color={section.accentColor}
+                                            color={effectiveAccent}
                                             style={styles.pinIcon}
                                         />
                                     )}
@@ -358,8 +365,8 @@ export function SectionCard({
                                             style={[
                                                 styles.glowDot,
                                                 {
-                                                    backgroundColor: section.accentColor,
-                                                    shadowColor: section.accentColor,
+                                                    backgroundColor: effectiveAccent,
+                                                    shadowColor: effectiveAccent,
                                                 },
                                             ]}
                                         />
