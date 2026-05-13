@@ -12,7 +12,7 @@ export const colors = {
     textMuted: 'rgba(245,245,247,0.42)',
     textDisabled: 'rgba(245,245,247,0.24)',
 
-    accent: '#7C5CFF',
+    accent: '#FFFFFF',
     accentAlt: '#5BC0FF',
     success: '#3DDC97',
     danger: '#FF5C7A',

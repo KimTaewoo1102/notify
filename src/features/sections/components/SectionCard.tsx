@@ -7,11 +7,8 @@ import {
     View,
 } from 'react-native';
 import Animated, {
-    Easing,
-    cancelAnimation,
     useAnimatedStyle,
     useSharedValue,
-    withRepeat,
     withSequence,
     withSpring,
     withTiming,
@@ -76,7 +73,6 @@ export function SectionCard({
     const dragScale = useSharedValue(1);
     const dragOpacity = useSharedValue(1);
     const shake = useSharedValue(0);
-    const glow = useSharedValue(section.notifyOn && !isSystem ? 0.7 : 0);
 
     useEffect(() => {
         dragScale.value = withSpring(isDragActive ? 1.04 : 1, {
@@ -88,30 +84,6 @@ export function SectionCard({
             stiffness: 240,
         });
     }, [isDragActive, dragScale, dragOpacity]);
-
-    useEffect(() => {
-        if (isSystem) return;
-        if (section.notifyOn) {
-            cancelAnimation(glow);
-            glow.value = withRepeat(
-                withSequence(
-                    withTiming(1, {
-                        duration: 1100,
-                        easing: Easing.inOut(Easing.quad),
-                    }),
-                    withTiming(0.4, {
-                        duration: 1100,
-                        easing: Easing.inOut(Easing.quad),
-                    }),
-                ),
-                -1,
-                true,
-            );
-        } else {
-            cancelAnimation(glow);
-            glow.value = withTiming(0, { duration: 240 });
-        }
-    }, [section.notifyOn, isSystem, glow]);
 
     const prevNotify = useRef(section.notifyOn);
     useEffect(() => {
@@ -137,10 +109,6 @@ export function SectionCard({
             { scale: dragScale.value },
         ],
         opacity: dragOpacity.value,
-    }));
-
-    const glowStyle = useAnimatedStyle(() => ({
-        opacity: glow.value,
     }));
 
     /* ─── 케밥 메뉴 ──────────────────────────────────────── */
@@ -224,22 +192,7 @@ export function SectionCard({
 
     return (
         <Animated.View style={[styles.outerWrapper, wrapperStyle]}>
-            {/* 카드 영역 — glowRing은 여기서만 */}
             <View style={styles.cardWrapper}>
-                {!isSystem && (
-                    <Animated.View
-                        pointerEvents="none"
-                        style={[
-                            styles.glowRing,
-                            {
-                                borderColor: effectiveAccent + 'AA',
-                                shadowColor: effectiveAccent,
-                            },
-                            glowStyle,
-                        ]}
-                    />
-                )}
-
                 <PressableScale
                     onPress={onPress}
                     onLongPress={
@@ -359,15 +312,12 @@ export function SectionCard({
                                             </Text>
                                         </View>
                                     )}
-                                    {/* notifyOn 글로우 도트 */}
+                                    {/* notifyOn 인디케이터 도트 */}
                                     {!isSystem && section.notifyOn && (
                                         <View
                                             style={[
                                                 styles.glowDot,
-                                                {
-                                                    backgroundColor: effectiveAccent,
-                                                    shadowColor: effectiveAccent,
-                                                },
+                                                { backgroundColor: effectiveAccent },
                                             ]}
                                         />
                                     )}
@@ -416,21 +366,7 @@ export function SectionCard({
 
 const styles = StyleSheet.create({
     outerWrapper: { marginVertical: 6 },
-    // 카드 + glowRing 만 감싸는 영역 (미리보기는 아래에 별도).
     cardWrapper: { position: 'relative' },
-    glowRing: {
-        position: 'absolute',
-        top: -2,
-        left: -2,
-        right: -2,
-        bottom: -2,
-        borderRadius: radius.lg + 2,
-        borderWidth: 1.5,
-        shadowOpacity: 0.7,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 4,
-    },
     card: { paddingVertical: spacing.md, paddingHorizontal: spacing.md },
     row: {
         flexDirection: 'row',
@@ -483,9 +419,6 @@ const styles = StyleSheet.create({
         width: 7,
         height: 7,
         borderRadius: 4,
-        shadowOpacity: 0.9,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 0 },
         marginRight: 2,
     },
     kebabBtn: {
