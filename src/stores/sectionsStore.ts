@@ -9,7 +9,7 @@ import { STORAGE_PREFIX, rnStorage } from './persist/asyncStorage';
 // TODO: 백엔드 연동 시 mock 시드 제거 ↓ 이 import 한 줄도 함께 삭제.
 import { buildMockSections } from '../data/mockSections';
 
-const ACCENTS = ['#7C5CFF', '#5BC0FF', '#FF7C9C', '#3DDC97', '#FFC857', '#FF9E5C'];
+const ACCENTS = ['#FFFFFF', '#5BC0FF', '#FF7C9C', '#3DDC97', '#FFC857', '#FF9E5C'];
 
 /** '고정' 시스템 섹션 시드 (앱 첫 실행 시 자동 추가, 사용자가 삭제 불가). */
 function makePinSystemSection(): Section {

@@ -396,7 +396,6 @@ const previewStyles = StyleSheet.create({
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
     const breath = useSharedValue(1);
-    const glow = useSharedValue(0.5);
 
     useEffect(() => {
         breath.value = withRepeat(
@@ -413,33 +412,15 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
             -1,
             false,
         );
-        glow.value = withRepeat(
-            withSequence(
-                withTiming(0.95, {
-                    duration: 1500,
-                    easing: Easing.inOut(Easing.quad),
-                }),
-                withTiming(0.45, {
-                    duration: 1500,
-                    easing: Easing.inOut(Easing.quad),
-                }),
-            ),
-            -1,
-            false,
-        );
-    }, [breath, glow]);
+    }, [breath]);
 
     const breathStyle = useAnimatedStyle(() => ({
         transform: [{ scale: breath.value }],
-    }));
-    const glowStyle = useAnimatedStyle(() => ({
-        opacity: glow.value,
     }));
 
     return (
         <View style={styles.empty}>
             <View style={styles.emptyOrb}>
-                <Animated.View style={[styles.glowRing, glowStyle]} />
                 <Animated.View style={breathStyle}>
                     <PressableScale
                         onPress={onAdd}
@@ -491,20 +472,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.md,
-    },
-    glowRing: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        borderRadius: 76,
-        borderWidth: 1,
-        borderColor: colors.accent + '55',
-        shadowColor: colors.accent,
-        shadowOpacity: 0.6,
-        shadowRadius: 24,
-        shadowOffset: { width: 0, height: 0 },
     },
     emptyBtn: {
         width: 92,

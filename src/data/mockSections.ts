@@ -31,8 +31,8 @@ const SPECS: MockSpec[] = [
     {
         id: 'mock:cs',
         title: '컴퓨터과학부',
-        accentColor: '#7C5CFF',
-        notifyOn: true, // Glow 펄스 시연용 — 첫 카드는 알림 ON 으로 시작
+        accentColor: '#FFFFFF',
+        notifyOn: true,
         keywords: ['컴퓨터과학부', '소프트웨어'],
     },
     {
