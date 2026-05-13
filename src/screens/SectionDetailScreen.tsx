@@ -606,11 +606,6 @@ function NoticeRow({
                 scaleTo={0.985}
                 style={[
                     styles.noticeCard,
-                    // 신규 공지 — accent 컬러 테두리 하이라이트 (선택/핀 스타일보다 낮은 우선순위)
-                    isNew && !selectionMode && !pinned && {
-                        borderColor: accent + 'CC',
-                        borderWidth: 1.5,
-                    },
                     pinned && !selectionMode && {
                         borderColor: PIN_COLOR + '66',
                         backgroundColor: PIN_COLOR + '0E',
@@ -644,6 +639,12 @@ function NoticeRow({
                                 {CATEGORY_LABEL[notice.category] ?? notice.category}
                             </Text>
                         </View>
+                        {/* 신규 공지 — 미니멀 'N' 뱃지 (테두리 대신 은은한 pill) */}
+                        {isNew && !selectionMode && !pinned && (
+                            <View style={styles.newBadge}>
+                                <Text style={styles.newBadgeText}>N</Text>
+                            </View>
+                        )}
                         {notice.isSourcePinned && (
                             <Ionicons name="pin" size={11} color={accent} style={styles.pinIcon} />
                         )}
@@ -895,6 +896,21 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     tagText: { ...typography.caption, fontWeight: '600', fontSize: 11 },
+    /* 신규 공지 'N' 뱃지 — Premium Black 테마에 어울리는 은은한 pill */
+    newBadge: {
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.28)',
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    newBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: colors.textPrimary,
+        letterSpacing: 0.4,
+    },
     pinIcon: { marginLeft: 2 },
     noticeTime: { ...typography.caption, color: colors.textMuted, marginLeft: 'auto' },
 

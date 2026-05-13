@@ -348,21 +348,12 @@ function UnreadPreview({
 }
 
 const previewStyles = StyleSheet.create({
+    /* 통합 셸(SectionCard) 내부에 렌더되므로 자체 bg/border/radius 불필요 */
     container: {
         flexDirection: 'row',
-        marginTop: 0,
-        marginHorizontal: 4,
-        backgroundColor: colors.bgRaised,
-        borderBottomLeftRadius: 12,
-        borderBottomRightRadius: 12,
-        borderWidth: 1,
-        borderTopWidth: 0,
-        borderColor: colors.border,
-        overflow: 'hidden',
     },
     bar: {
         width: 3,
-        borderBottomLeftRadius: 12,
     },
     list: {
         flex: 1,
