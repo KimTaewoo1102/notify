@@ -13,12 +13,12 @@ import Animated, {
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { Card } from '../../../ui/primitives/Card';
 import { PressableScale } from '../../../ui/primitives/PressableScale';
 import { haptic } from '../../../ui/feedback/haptics';
-import { colors, radius, spacing, typography } from '../../../ui/theme';
+import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
 
 /** 모든 user 섹션에 동일하게 적용되는 통일 accent. 시스템 섹션은 자체 accentColor 유지. */
 const USER_ACCENT = colors.accent;
@@ -47,7 +47,7 @@ interface Props {
     totalNoticeCount?: number;
     /** 안 읽은 공지 개수 (lastVisitedAt 이후 신규 공지 수). */
     unreadCount?: number;
-    /** 카드 아래에 렌더할 미리보기 영역 (Phase 3에서 주입). */
+    /** 카드 아래에 렌더할 미리보기 영역. */
     previewSlot?: React.ReactNode;
 }
 
@@ -67,7 +67,6 @@ export function SectionCard({
     previewSlot,
 }: Props) {
     const isSystem = section.kind === 'system';
-    // 시스템 섹션은 고유 accentColor(warm yellow) 유지, user 섹션은 단일 톤으로 통일.
     const effectiveAccent = isSystem ? section.accentColor : USER_ACCENT;
 
     const dragScale = useSharedValue(1);
@@ -156,11 +155,12 @@ export function SectionCard({
 
     const showKebab = !isSystem && !editMode;
     const showDelete = !isSystem && editMode;
+    const showAccentLine = isSystem || section.notifyOn || section.pinned;
+    const shadowSize = isSystem || section.pinned ? 'lg' : 'md';
 
     /* ─── 좌측 leading 내용 ─────────────────────────────── */
     const renderLeading = () => {
         if (isSystem) {
-            // 고정 섹션도 공지 개수 숫자를 동일하게 표시 (pinnedCount 사용)
             const count = pinnedCount ?? null;
             return (
                 <Text
@@ -174,7 +174,6 @@ export function SectionCard({
         if (section.emoji) {
             return <Text style={styles.emoji}>{section.emoji}</Text>;
         }
-        // 전체 공지 개수 숫자
         const count = totalNoticeCount ?? null;
         return (
             <Text
@@ -192,7 +191,34 @@ export function SectionCard({
 
     return (
         <Animated.View style={[styles.outerWrapper, wrapperStyle]}>
-            <View style={styles.cardWrapper}>
+            {/* 통합 카드 셸 — 카드 헤더와 미리보기를 하나의 둥근 덩어리로 감싼다 */}
+            <View
+                style={[
+                    styles.unifiedShell,
+                    shadows[shadowSize],
+                    isSystem && {
+                        backgroundColor: colors.bgRaisedAlt,
+                        borderColor: effectiveAccent + '33',
+                        shadowColor: effectiveAccent,
+                        shadowOpacity: 0.22,
+                    },
+                    !isSystem && section.pinned && {
+                        shadowColor: effectiveAccent,
+                        shadowOpacity: 0.35,
+                    },
+                ]}
+            >
+                {/* 상단 accent 그라데이션 라인 */}
+                {showAccentLine ? (
+                    <LinearGradient
+                        colors={['transparent', effectiveAccent + 'CC', 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.accentLine}
+                        pointerEvents="none"
+                    />
+                ) : null}
+
                 <PressableScale
                     onPress={onPress}
                     onLongPress={
@@ -207,26 +233,7 @@ export function SectionCard({
                     hapticKind={editMode || isSystem ? null : 'light'}
                     scaleTo={isSystem ? 0.99 : 0.98}
                 >
-                    <Card
-                        accent={effectiveAccent}
-                        showAccentLine={
-                            isSystem || section.notifyOn || section.pinned
-                        }
-                        shadow={isSystem || section.pinned ? 'lg' : 'md'}
-                        style={[
-                            styles.card,
-                            isSystem && {
-                                backgroundColor: colors.bgRaisedAlt,
-                                borderColor: effectiveAccent + '33',
-                                shadowColor: effectiveAccent,
-                                shadowOpacity: 0.22,
-                            },
-                            !isSystem && section.pinned && {
-                                shadowColor: effectiveAccent,
-                                shadowOpacity: 0.35,
-                            },
-                        ]}
-                    >
+                    <View style={styles.cardContent}>
                         <View style={styles.row}>
                             <View
                                 style={[
@@ -299,7 +306,6 @@ export function SectionCard({
                                 </Pressable>
                             ) : (
                                 <View style={styles.trailing}>
-                                    {/* 안 읽은 공지 뱃지 (카카오톡 스타일) */}
                                     {showUnreadBadge && (
                                         <View
                                             style={[
@@ -312,11 +318,10 @@ export function SectionCard({
                                             </Text>
                                         </View>
                                     )}
-                                    {/* notifyOn 인디케이터 도트 */}
                                     {!isSystem && section.notifyOn && (
                                         <View
                                             style={[
-                                                styles.glowDot,
+                                                styles.notifyDot,
                                                 { backgroundColor: effectiveAccent },
                                             ]}
                                         />
@@ -347,12 +352,17 @@ export function SectionCard({
                                 </View>
                             )}
                         </View>
-                    </Card>
+                    </View>
                 </PressableScale>
-            </View>
 
-            {/* 미리보기 슬롯 — Phase 3에서 HomeScreen이 주입 */}
-            {previewSlot}
+                {/* 미리보기 슬롯 — 통합 셸 내부에서 구분선 아래 렌더 */}
+                {previewSlot && (
+                    <>
+                        <View style={styles.internalDivider} />
+                        {previewSlot}
+                    </>
+                )}
+            </View>
 
             <SectionCardMenu
                 visible={!!menuAnchor}
@@ -366,8 +376,33 @@ export function SectionCard({
 
 const styles = StyleSheet.create({
     outerWrapper: { marginVertical: 6 },
-    cardWrapper: { position: 'relative' },
-    card: { paddingVertical: spacing.md, paddingHorizontal: spacing.md },
+    /* 카드 헤더 + 미리보기를 하나의 시각 단위로 묶는 외곽 셸 */
+    unifiedShell: {
+        backgroundColor: colors.bgRaised,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: 'hidden',
+    },
+    /* 상단 1.5px 그라데이션 accent 라인 */
+    accentLine: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 1.5,
+        zIndex: 1,
+    },
+    cardContent: {
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+    },
+    /* 카드 헤더와 미리보기 사이의 얇은 구분선 */
+    internalDivider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: colors.borderStrong,
+        marginHorizontal: spacing.md,
+    },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -381,7 +416,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     emoji: { fontSize: 20 },
-    // 전체 공지 개수 — dot 을 대체.
     countText: {
         fontSize: 15,
         fontWeight: '700',
@@ -391,16 +425,16 @@ const styles = StyleSheet.create({
     titleRow: { flexDirection: 'row', alignItems: 'center' },
     pinIcon: { marginRight: 4 },
     systemLeadingIcon: { marginTop: -1 },
-    title: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
+    title: { ...typography.body, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
     systemTitle: { letterSpacing: 0.2 },
     meta: {
         ...typography.caption,
-        color: colors.textSecondary,
+        fontWeight: '600',
+        color: 'rgba(245,245,247,0.80)',
         marginTop: 2,
     },
     metaDim: { color: colors.textMuted },
     trailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    // 카카오톡 스타일 unread 뱃지.
     unreadBadge: {
         minWidth: 20,
         height: 20,
@@ -415,7 +449,7 @@ const styles = StyleSheet.create({
         color: '#fff',
         lineHeight: 14,
     },
-    glowDot: {
+    notifyDot: {
         width: 7,
         height: 7,
         borderRadius: 4,
