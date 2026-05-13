@@ -377,12 +377,14 @@ const previewStyles = StyleSheet.create({
     },
     title: {
         ...typography.caption,
-        color: colors.textSecondary,
+        fontWeight: '600',
+        color: 'rgba(245,245,247,0.75)',
         flex: 1,
     },
     time: {
         ...typography.caption,
-        color: colors.textMuted,
+        fontWeight: '500',
+        color: 'rgba(245,245,247,0.50)',
         fontSize: 11,
     },
     more: {
