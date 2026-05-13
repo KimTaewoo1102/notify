@@ -72,14 +72,21 @@ export const SwipeableNoticeRow = React.forwardRef<SwipeableNoticeRowHandle, Pro
 
         const panResponder = useRef(
             PanResponder.create({
-                // dx가 명확히 수평 방향일 때만 제스처를 획득:
-                //   · 수평 이동 최소 10px
-                //   · 수평 이동이 수직의 2.5배 이상 (기울기 약 22°)
-                //   · 수직 이동이 15px 미만 (수직 스크롤과 명확히 구분)
+                /**
+                 * ✦ 캡쳐 단계 ✦
+                 * ScrollView 가 vertical pan 을 가져가기 전에 horizontal pan 을
+                 * 가로채기 위해 capture phase 에서 동일한 조건을 평가한다.
+                 * 이게 없으면 부모 ScrollView 가 먼저 responder 가 되면서
+                 * 좌측 스와이프가 '씹힘'.
+                 */
+                onMoveShouldSetPanResponderCapture: (_, g) =>
+                    Math.abs(g.dx) > 6 &&
+                    Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+                // 보조 — bubble phase 에서도 동일 조건으로 한 번 더 시도
                 onMoveShouldSetPanResponder: (_, g) =>
-                    Math.abs(g.dx) > 10 &&
-                    Math.abs(g.dx) > Math.abs(g.dy) * 2.5 &&
-                    Math.abs(g.dy) < 15,
+                    Math.abs(g.dx) > 6 &&
+                    Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+                onPanResponderTerminationRequest: () => false,
                 onPanResponderGrant: () => {
                     isFullSwiped.current = false;
                 },
