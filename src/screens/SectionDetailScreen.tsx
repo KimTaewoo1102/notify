@@ -9,6 +9,7 @@ import React, {
 import {
     ActivityIndicator,
     Linking,
+    Pressable,
     RefreshControl,
     ScrollView,
     Share,
@@ -34,7 +35,10 @@ import {
 import { SectionTrashButton } from '../features/notices/components/SectionTrashButton';
 import { SelectionActionBar } from '../features/notices/components/SelectionActionBar';
 import { NoticeBulkDeleteModal } from '../features/notices/components/NoticeBulkDeleteModal';
-import { SwipeableNoticeRow } from '../features/notices/components/SwipeableNoticeRow';
+import {
+    SwipeableNoticeRow,
+    type SwipeableNoticeRowHandle,
+} from '../features/notices/components/SwipeableNoticeRow';
 import {
     NoticeContextMenu,
     type NoticeMenuAnchor,
@@ -123,6 +127,17 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         notice: Notice;
         anchor: NoticeMenuAnchor;
     } | null>(null);
+
+    /* ─── 스와이프 row 외부 터치 닫기 ──────────────────── */
+    const rowHandles = useRef<Map<ID, SwipeableNoticeRowHandle>>(new Map());
+    const openRowIdRef = useRef<ID | null>(null);
+
+    const closeOpenRow = useCallback(() => {
+        if (openRowIdRef.current) {
+            rowHandles.current.get(openRowIdRef.current)?.close();
+            openRowIdRef.current = null;
+        }
+    }, []);
 
     const exitSelection = useCallback(() => {
         setSelectionMode(false);
@@ -222,25 +237,38 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
     const onPressNotice = useCallback(
         (n: Notice) => {
+            // 스와이프가 열려 있으면 닫고 탭을 소비 (이동하지 않음)
+            if (openRowIdRef.current !== null) {
+                closeOpenRow();
+                return;
+            }
             if (selectionMode) {
                 haptic('selection');
                 toggleSelected(n.id);
-                return;
             }
+        },
+        [selectionMode, toggleSelected, closeOpenRow],
+    );
+
+    /** 외부 링크 아이콘 전용 핸들러 — 카드 전체 탭이 아닌 아이콘에서만 호출 */
+    const onOpenNoticeUrl = useCallback(
+        (n: Notice) => {
+            closeOpenRow();
             haptic('light');
             Linking.openURL(n.sourceUrl).catch(() => {});
         },
-        [selectionMode, toggleSelected],
+        [closeOpenRow],
     );
 
     /* ─── Context menu trigger ───────────────────────── */
     const onLongPressNotice = useCallback(
         (notice: Notice, anchor: NoticeMenuAnchor) => {
             if (selectionMode) return;
+            closeOpenRow();
             haptic('medium');
             setMenuTarget({ notice, anchor });
         },
-        [selectionMode],
+        [selectionMode, closeOpenRow],
     );
 
     const closeMenu = useCallback(() => setMenuTarget(null), []);
@@ -354,6 +382,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         <View style={styles.root}>
             <ScrollView
                 contentContainerStyle={styles.content}
+                onScrollBeginDrag={closeOpenRow}
                 refreshControl={
                     !isSystemPin ? (
                         <RefreshControl
@@ -470,7 +499,17 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                             notices.map(notice => (
                                 <SwipeableNoticeRow
                                     key={notice.id}
+                                    ref={(handle) => {
+                                        if (handle) rowHandles.current.set(notice.id, handle);
+                                        else rowHandles.current.delete(notice.id);
+                                    }}
                                     onDelete={() => deleteNotice(notice)}
+                                    onReveal={() => {
+                                        if (openRowIdRef.current && openRowIdRef.current !== notice.id) {
+                                            rowHandles.current.get(openRowIdRef.current)?.close();
+                                        }
+                                        openRowIdRef.current = notice.id;
+                                    }}
                                 >
                                     <NoticeRow
                                         notice={notice}
@@ -483,6 +522,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                                         onLongPress={(anchor) =>
                                             onLongPressNotice(notice, anchor)
                                         }
+                                        onOpenUrl={() => onOpenNoticeUrl(notice)}
                                     />
                                 </SwipeableNoticeRow>
                             ))
@@ -520,7 +560,17 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                             return (
                                 <SwipeableNoticeRow
                                     key={notice.id}
+                                    ref={(handle) => {
+                                        if (handle) rowHandles.current.set(notice.id, handle);
+                                        else rowHandles.current.delete(notice.id);
+                                    }}
                                     onDelete={() => deleteNotice(notice)}
+                                    onReveal={() => {
+                                        if (openRowIdRef.current && openRowIdRef.current !== notice.id) {
+                                            rowHandles.current.get(openRowIdRef.current)?.close();
+                                        }
+                                        openRowIdRef.current = notice.id;
+                                    }}
                                 >
                                     <NoticeRow
                                         notice={notice}
@@ -533,6 +583,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                                         onLongPress={(anchor) =>
                                             onLongPressNotice(notice, anchor)
                                         }
+                                        onOpenUrl={() => onOpenNoticeUrl(notice)}
                                     />
                                 </SwipeableNoticeRow>
                             );
@@ -576,16 +627,18 @@ function NoticeRow({
     isNew,
     onPress,
     onLongPress,
+    onOpenUrl,
 }: {
     notice: Notice;
     accent: string;
     pinned: boolean;
     selectionMode: boolean;
     isSelected: boolean;
-    /** 진입 당시 lastVisitedAt 이후 올라온 신규 공지 — accent 테두리 하이라이트. */
     isNew: boolean;
     onPress: () => void;
     onLongPress: (anchor: NoticeMenuAnchor) => void;
+    /** 외부 링크 아이콘 전용 핸들러 — 카드 전체가 아닌 아이콘에서만 URL을 엽니다 */
+    onOpenUrl: () => void;
 }) {
     /** 카드 위치 측정 → 컨텍스트 메뉴 anchor. */
     const ref = useRef<View>(null);
@@ -690,12 +743,20 @@ function NoticeRow({
                             </View>
                         )}
                         {!selectionMode && (
-                            <Ionicons
-                                name="open-outline"
-                                size={13}
-                                color={colors.textMuted}
-                                style={styles.externalIcon}
-                            />
+                            <Pressable
+                                onPress={onOpenUrl}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 4 }}
+                                style={({ pressed }) => [
+                                    styles.externalIconBtn,
+                                    pressed && { opacity: 0.5 },
+                                ]}
+                            >
+                                <Ionicons
+                                    name="open-outline"
+                                    size={13}
+                                    color={colors.textMuted}
+                                />
+                            </Pressable>
                         )}
                     </View>
                 </View>
@@ -934,5 +995,8 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     matchChipText: { fontSize: 11, fontWeight: '600' },
-    externalIcon: { marginLeft: spacing.xs },
+    externalIconBtn: {
+        padding: 3,
+        marginLeft: spacing.xs,
+    },
 });

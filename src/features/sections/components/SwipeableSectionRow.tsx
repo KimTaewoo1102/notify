@@ -51,8 +51,8 @@ export function SwipeableSectionRow({ onDelete, children }: Props) {
     const pan = useMemo(
         () =>
             Gesture.Pan()
-                .activeOffsetX([-12, 999])
-                .failOffsetY([-14, 14])
+                .activeOffsetX([-10, 999])
+                .failOffsetY([-8, 8])
                 .onUpdate((e) => {
                     const dx = Math.min(0, e.translationX);
                     const overshoot = Math.max(0, -dx - ACTION_WIDTH);
