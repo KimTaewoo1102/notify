@@ -108,6 +108,6 @@ const styles = StyleSheet.create({
         color: colors.accent,
     },
     doneText: {
-        color: '#fff',
+        color: colors.bgBase,
     },
 });

@@ -199,15 +199,19 @@ export function SectionCard({
                     isSystem && {
                         backgroundColor: colors.bgRaisedAlt,
                         borderColor: effectiveAccent + '33',
-                        shadowColor: effectiveAccent,
-                        shadowOpacity: 0.22,
-                    },
-                    !isSystem && section.pinned && {
-                        shadowColor: effectiveAccent,
-                        shadowOpacity: 0.35,
                     },
                 ]}
             >
+                {/* 시스템(고정) 섹션 전용 좌측 accent 스트라이프 */}
+                {isSystem && (
+                    <View
+                        style={[
+                            styles.sideStripe,
+                            { backgroundColor: effectiveAccent },
+                        ]}
+                        pointerEvents="none"
+                    />
+                )}
                 {/* 상단 accent 그라데이션 라인 */}
                 {showAccentLine ? (
                     <LinearGradient
@@ -383,6 +387,16 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         overflow: 'hidden',
+    },
+    /* 시스템 카드 좌측 2px accent 스트라이프 */
+    sideStripe: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: 2.5,
+        opacity: 0.7,
+        zIndex: 1,
     },
     /* 상단 1.5px 그라데이션 accent 라인 */
     accentLine: {
