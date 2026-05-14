@@ -142,7 +142,7 @@ export const SwipeableNoticeRow = React.forwardRef<SwipeableNoticeRowHandle, Pro
 
                 {/* 공지 카드 (슬라이드되는 앞면) */}
                 <Animated.View
-                    style={{ transform: [{ translateX }] }}
+                    style={{ transform: [{ translateX }], zIndex: 1 }}
                     {...panResponder.panHandlers}
                 >
                     {children}
@@ -167,6 +167,8 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+        zIndex: 0,
+        elevation: 0,
     },
     trashBtn: {
         alignItems: 'center',

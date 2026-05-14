@@ -733,11 +733,10 @@ const headerBtnStyles = StyleSheet.create({
     rightRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.xs,
+        gap: spacing.md,
     },
     btn: {
-        width: 32,
-        height: 32,
+        padding: spacing.xs,
         alignItems: 'center',
         justifyContent: 'center',
     },

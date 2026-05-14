@@ -59,13 +59,16 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
             onToggleNotifyRef.current();
         };
 
+        const callOnOpen = () => {
+            onOpenRef.current?.();
+        };
+
         const pan = useMemo(
             () =>
                 Gesture.Pan()
                     .activeOffsetX([-10, 999])
                     .failOffsetY([-8, 8])
                     .onUpdate((e) => {
-                        // 이동 범위를 ACTION_WIDTH로 hard clamp — 오버슈트 없음
                         const dx = Math.min(0, e.translationX);
                         translateX.value = Math.max(-ACTION_WIDTH, dx);
                     })
@@ -74,7 +77,7 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
                         if (opened) {
                             translateX.value = withTiming(-ACTION_WIDTH, ANIM);
                             runOnJS(haptic)('selection');
-                            runOnJS(() => onOpenRef.current?.())();
+                            runOnJS(callOnOpen)();
                         } else {
                             translateX.value = withTiming(0, ANIM);
                         }
@@ -92,7 +95,7 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
                 {/* 액션 버튼 배경 — 알림 토글(좌) + 삭제(우) */}
                 <View style={styles.actionsBg}>
                     <Pressable
-                        onPress={() => runOnJS(callToggleNotify)()}
+                        onPress={callToggleNotify}
                         style={[styles.actionBtn, styles.notifyBtn]}
                     >
                         <Ionicons
@@ -106,7 +109,7 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
                     </Pressable>
 
                     <Pressable
-                        onPress={() => runOnJS(callDelete)()}
+                        onPress={callDelete}
                         style={[styles.actionBtn, styles.deleteBtn]}
                     >
                         <Ionicons name="trash" size={20} color="#fff" />

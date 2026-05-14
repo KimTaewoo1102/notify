@@ -155,7 +155,7 @@ export function SectionCard({
 
     const showKebab = !isSystem && !editMode;
     const showDelete = !isSystem && editMode;
-    const showAccentLine = isSystem; // user 섹션 글로우 라인 제거
+    const showAccentLine = false;
     const shadowSize = isSystem ? 'lg' : 'md';
 
     /* ─── 좌측 leading 내용 ─────────────────────────────── */
@@ -198,20 +198,9 @@ export function SectionCard({
                     shadows[shadowSize],
                     isSystem && {
                         backgroundColor: colors.bgRaisedAlt,
-                        borderColor: effectiveAccent + '33',
                     },
                 ]}
             >
-                {/* 시스템(고정) 섹션 전용 좌측 accent 스트라이프 */}
-                {isSystem && (
-                    <View
-                        style={[
-                            styles.sideStripe,
-                            { backgroundColor: effectiveAccent },
-                        ]}
-                        pointerEvents="none"
-                    />
-                )}
                 {/* 상단 accent 그라데이션 라인 */}
                 {showAccentLine ? (
                     <LinearGradient
