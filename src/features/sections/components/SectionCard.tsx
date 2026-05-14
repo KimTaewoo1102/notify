@@ -155,8 +155,8 @@ export function SectionCard({
 
     const showKebab = !isSystem && !editMode;
     const showDelete = !isSystem && editMode;
-    const showAccentLine = isSystem || section.notifyOn || section.pinned;
-    const shadowSize = isSystem || section.pinned ? 'lg' : 'md';
+    const showAccentLine = isSystem; // user 섹션 글로우 라인 제거
+    const shadowSize = isSystem ? 'lg' : 'md';
 
     /* ─── 좌측 leading 내용 ─────────────────────────────── */
     const renderLeading = () => {
@@ -283,11 +283,16 @@ export function SectionCard({
                                         ) : (
                                             '공지를 길게 눌러 고정해 보세요'
                                         )
+                                    ) : section.keywords.length === 0 ? (
+                                        <Text style={styles.metaDim}>키워드 없음</Text>
                                     ) : (
                                         <>
-                                            키워드 {section.keywords.length}
-                                            <Text style={styles.metaDim}> · </Text>
-                                            {section.notifyOn ? '알림 ON' : '알림 OFF'}
+                                            {section.keywords.slice(0, 3).map(k => k.text).join(' · ')}
+                                            {section.keywords.length > 3 && (
+                                                <Text style={styles.metaDim}>
+                                                    {` 외 ${section.keywords.length - 3}개`}
+                                                </Text>
+                                            )}
                                         </>
                                     )}
                                 </Text>
@@ -322,12 +327,11 @@ export function SectionCard({
                                             </Text>
                                         </View>
                                     )}
-                                    {!isSystem && section.notifyOn && (
-                                        <View
-                                            style={[
-                                                styles.notifyDot,
-                                                { backgroundColor: effectiveAccent },
-                                            ]}
+                                    {!isSystem && (
+                                        <Ionicons
+                                            name={section.notifyOn ? 'notifications' : 'notifications-off'}
+                                            size={15}
+                                            color={section.notifyOn ? colors.textSecondary : colors.textDisabled}
                                         />
                                     )}
                                     {showKebab ? (
@@ -462,12 +466,6 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
         lineHeight: 14,
-    },
-    notifyDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        marginRight: 2,
     },
     kebabBtn: {
         width: 28,
