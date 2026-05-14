@@ -23,7 +23,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PressableScale } from '../ui/primitives/PressableScale';
 import { haptic } from '../ui/feedback/haptics';
-import { colors, shadows, spacing, typography } from '../ui/theme';
+import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { EditDoneButton } from '../features/home/EditDoneButton';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
@@ -69,6 +69,14 @@ export default function HomeScreen({ navigation }: Props) {
     const setNoticeCache = useNoticeCacheStore(s => s.setCache);
 
     const [renameTarget, setRenameTarget] = useState<Section | null>(null);
+    const [hotNotice, setHotNotice] = useState<Notice | null>(null);
+
+    /* ─── HOT 공지 #1 fetch ── */
+    useEffect(() => {
+        uosAdapter.fetchHot().then(list => {
+            if (list.length > 0) setHotNotice(list[0]);
+        });
+    }, []);
 
     /* ─── 홈 마운트 시 모든 user 섹션 공지 백그라운드 fetch ── */
     useEffect(() => {
@@ -171,16 +179,25 @@ export default function HomeScreen({ navigation }: Props) {
 
     // 시스템 섹션은 항상 최상단에 자리하며, 편집 모드와 무관하게 jiggle/drag/'-' 가
     // 절대 노출되지 않도록 ListHeaderComponent 슬롯에 분리해 렌더한다.
-    const renderPinHeader = () =>
-        pinSection ? (
-            <View style={styles.pinHeader}>
-                <SectionCard
-                    section={pinSection}
-                    pinnedCount={pinnedCount}
-                    onPress={() => onPressSection(pinSection)}
+    const renderPinHeader = () => (
+        <>
+            {hotNotice && (
+                <HotNoticeCard
+                    notice={hotNotice}
+                    onPress={() => navigation.navigate('HotNotices')}
                 />
-            </View>
-        ) : null;
+            )}
+            {pinSection && (
+                <View style={styles.pinHeader}>
+                    <SectionCard
+                        section={pinSection}
+                        pinnedCount={pinnedCount}
+                        onPress={() => onPressSection(pinSection)}
+                    />
+                </View>
+            )}
+        </>
+    );
 
     // 일반(비편집) 모드에서 user 섹션 1개를 렌더하는 공통 핸들러.
     const renderUserRow = (item: Section) => {
@@ -302,6 +319,132 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
     );
 }
+
+/* ──────────────────── HotNoticeCard ───────────────────────── */
+
+function HotNoticeCard({
+    notice,
+    onPress,
+}: {
+    notice: Notice;
+    onPress: () => void;
+}) {
+    const diff = Date.now() - new Date(notice.publishedAt).getTime();
+    const hours = Math.floor(diff / (60 * 60 * 1000));
+    const timeStr =
+        hours < 1 ? '방금' : hours < 24 ? `${hours}시간 전` : `${Math.floor(hours / 24)}일 전`;
+
+    const viewCount = notice.viewCount ?? 0;
+    const viewStr =
+        viewCount >= 10000
+            ? `${(viewCount / 10000).toFixed(1)}만`
+            : viewCount >= 1000
+              ? `${(viewCount / 1000).toFixed(1)}k`
+              : String(viewCount);
+
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [hotStyles.card, pressed && hotStyles.pressed]}
+        >
+            <View style={hotStyles.topRow}>
+                <View style={hotStyles.badge}>
+                    <Text style={hotStyles.badgeText}>HOT</Text>
+                </View>
+                <Text style={hotStyles.seeAll}>전체 보기</Text>
+                <Ionicons name="chevron-forward" size={13} color={colors.textDisabled} />
+            </View>
+            <Text style={hotStyles.title} numberOfLines={2}>
+                {notice.title}
+            </Text>
+            <View style={hotStyles.bottomRow}>
+                <Text style={hotStyles.dept} numberOfLines={1}>
+                    {notice.department}
+                </Text>
+                <View style={hotStyles.metaRight}>
+                    {viewCount > 0 && (
+                        <View style={hotStyles.viewRow}>
+                            <Ionicons name="eye-outline" size={11} color={colors.textMuted} />
+                            <Text style={hotStyles.viewText}>{viewStr}</Text>
+                        </View>
+                    )}
+                    <Text style={hotStyles.time}>{timeStr}</Text>
+                </View>
+            </View>
+        </Pressable>
+    );
+}
+
+const hotStyles = StyleSheet.create({
+    card: {
+        backgroundColor: colors.bgRaised,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.borderStrong,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+        gap: spacing.xs,
+        ...shadows.sm,
+    },
+    pressed: { opacity: 0.75 },
+    topRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    badge: {
+        backgroundColor: colors.danger,
+        borderRadius: radius.sm,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    badgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: 0.8,
+    },
+    seeAll: {
+        ...typography.caption,
+        color: colors.textMuted,
+        flex: 1,
+    },
+    title: {
+        ...typography.body,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    bottomRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.xs,
+    },
+    dept: {
+        ...typography.caption,
+        color: colors.textMuted,
+        flex: 1,
+    },
+    metaRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+    viewRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    viewText: {
+        fontSize: 11,
+        fontWeight: '500',
+        color: colors.textMuted,
+    },
+    time: {
+        ...typography.caption,
+        color: colors.textMuted,
+    },
+});
 
 /* ──────────────────── UnreadPreview ───────────────────────── */
 

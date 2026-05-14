@@ -4,6 +4,7 @@ import type { ID } from '../types/domain';
 export type RootStackParamList = {
     Home: undefined;
     SectionDetail: { sectionId: ID };
+    HotNotices: undefined;
     Trash: undefined;
 };
 

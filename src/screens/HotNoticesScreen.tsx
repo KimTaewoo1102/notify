@@ -1,0 +1,256 @@
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { haptic } from '../ui/feedback/haptics';
+import { colors, radius, shadows, spacing, typography } from '../ui/theme';
+import { uosAdapter } from '../services/universities/uos';
+import type { Notice } from '../types/domain';
+import type { RootStackScreenProps } from '../navigation/types';
+
+type Props = RootStackScreenProps<'HotNotices'>;
+
+const CATEGORY_LABEL: Record<string, string> = {
+    academic: '학사',
+    scholarship: '장학',
+    recruit: '채용',
+    event: '행사',
+    library: '도서관',
+    dorm: '생활관',
+    general: '일반',
+};
+
+function timeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const hours = Math.floor(diff / (60 * 60 * 1000));
+    if (hours < 1) return '방금';
+    if (hours < 24) return `${hours}시간 전`;
+    return `${Math.floor(hours / 24)}일 전`;
+}
+
+function formatViewCount(n: number): string {
+    if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+    return String(n);
+}
+
+export default function HotNoticesScreen({ navigation }: Props) {
+    const [notices, setNotices] = useState<Notice[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        navigation.setOptions({ title: 'HOT 공지' });
+        uosAdapter.fetchHot().then(data => {
+            setNotices(data);
+            setLoading(false);
+        });
+    }, [navigation]);
+
+    const openUrl = (url: string) => {
+        haptic('light');
+        Linking.openURL(url);
+    };
+
+    return (
+        <View style={styles.root}>
+            <ScrollView
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.headerRow}>
+                    <View style={styles.hotBadge}>
+                        <Text style={styles.hotBadgeText}>HOT</Text>
+                    </View>
+                    <Text style={styles.headerDesc}>조회수 높은 최신 공지</Text>
+                </View>
+
+                {loading ? (
+                    <ActivityIndicator
+                        color={colors.textMuted}
+                        style={{ marginTop: spacing.xl }}
+                    />
+                ) : (
+                    notices.map((n, idx) => (
+                        <Pressable
+                            key={n.id}
+                            onPress={() => openUrl(n.sourceUrl)}
+                            style={({ pressed }) => [
+                                styles.card,
+                                pressed && styles.cardPressed,
+                            ]}
+                        >
+                            <View style={styles.rankBadge}>
+                                <Text
+                                    style={[
+                                        styles.rankText,
+                                        idx === 0 && styles.rankTextTop,
+                                    ]}
+                                >
+                                    {idx + 1}
+                                </Text>
+                            </View>
+                            <View style={styles.cardBody}>
+                                <View style={styles.cardMeta}>
+                                    <View style={styles.categoryChip}>
+                                        <Text style={styles.categoryText}>
+                                            {CATEGORY_LABEL[n.category] ?? n.category}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.metaTime}>
+                                        {timeAgo(n.publishedAt)}
+                                    </Text>
+                                </View>
+                                <Text style={styles.cardTitle} numberOfLines={2}>
+                                    {n.title}
+                                </Text>
+                                <View style={styles.cardFooter}>
+                                    <Text style={styles.department} numberOfLines={1}>
+                                        {n.department}
+                                    </Text>
+                                    {(n.viewCount ?? 0) > 0 && (
+                                        <View style={styles.viewRow}>
+                                            <Ionicons
+                                                name="eye-outline"
+                                                size={12}
+                                                color={colors.textMuted}
+                                            />
+                                            <Text style={styles.viewCount}>
+                                                {formatViewCount(n.viewCount!)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                            <Ionicons
+                                name="chevron-forward"
+                                size={16}
+                                color={colors.textDisabled}
+                                style={styles.chevron}
+                            />
+                        </Pressable>
+                    ))
+                )}
+            </ScrollView>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgBase },
+    list: { padding: spacing.lg, paddingBottom: 120, gap: spacing.sm },
+
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginBottom: spacing.xs,
+    },
+    hotBadge: {
+        backgroundColor: '#FF5C7A',
+        borderRadius: radius.sm,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    hotBadgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: 0.8,
+    },
+    headerDesc: {
+        ...typography.bodySm,
+        color: colors.textMuted,
+    },
+
+    card: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.bgRaised,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        gap: spacing.sm,
+        ...shadows.sm,
+    },
+    cardPressed: { opacity: 0.7 },
+
+    rankBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: colors.bgRaisedAlt,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    rankText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: colors.textMuted,
+    },
+    rankTextTop: {
+        color: '#FF5C7A',
+    },
+
+    cardBody: { flex: 1, gap: 4 },
+    cardMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    categoryChip: {
+        backgroundColor: colors.bgRaisedAlt,
+        borderRadius: radius.sm,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    categoryText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: colors.textSecondary,
+    },
+    metaTime: {
+        ...typography.caption,
+        color: colors.textMuted,
+    },
+
+    cardTitle: {
+        ...typography.body,
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+
+    cardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.xs,
+    },
+    department: {
+        ...typography.caption,
+        color: colors.textMuted,
+        flex: 1,
+    },
+    viewRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    viewCount: {
+        fontSize: 11,
+        fontWeight: '500',
+        color: colors.textMuted,
+    },
+
+    chevron: { flexShrink: 0 },
+});

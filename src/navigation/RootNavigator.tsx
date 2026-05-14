@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import HomeScreen from '../screens/HomeScreen';
 import SectionDetailScreen from '../screens/SectionDetailScreen';
+import HotNoticesScreen from '../screens/HotNoticesScreen';
 import TrashScreen from '../screens/TrashScreen';
 import { HeaderBanner } from '../features/home/HeaderBanner';
 
@@ -35,6 +36,11 @@ export default function RootNavigator() {
                 name="SectionDetail"
                 component={SectionDetailScreen}
                 options={{ title: '' }}
+            />
+            <Stack.Screen
+                name="HotNotices"
+                component={HotNoticesScreen}
+                options={{ title: 'HOT 공지' }}
             />
             <Stack.Screen
                 name="Trash"
