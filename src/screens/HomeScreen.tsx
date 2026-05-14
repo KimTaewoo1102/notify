@@ -27,6 +27,7 @@ import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { EditDoneButton } from '../features/home/EditDoneButton';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
+import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
 import { RenameSectionModal } from '../features/sections/components/RenameSectionModal';
 import {
@@ -231,26 +232,32 @@ export default function HomeScreen({ navigation }: Props) {
             .slice(0, 2);
 
         return (
-            <SectionCard
-                section={item}
-                totalNoticeCount={noticeCountCache[item.id]}
-                unreadCount={unread}
-                onPress={() => onPressSection(item)}
-                onLongPress={onLongPressSection}
-                onToggleNotify={() => toggleNotify(item.id)}
-                onEditKeywords={() => openKeywordEdit(item.id)}
-                onRename={() => setRenameTarget(item)}
+            <SwipeableSectionRow
                 onDelete={() => confirmDelete(item)}
-                previewSlot={
-                    previews.length > 0 ? (
-                        <UnreadPreview
-                            notices={previews}
-                            totalCount={allVisible.length}
-                            accent={colors.accent}
-                        />
-                    ) : undefined
-                }
-            />
+                onToggleNotify={() => toggleNotify(item.id)}
+                notifyOn={item.notifyOn}
+            >
+                <SectionCard
+                    section={item}
+                    totalNoticeCount={noticeCountCache[item.id]}
+                    unreadCount={unread}
+                    onPress={() => onPressSection(item)}
+                    onLongPress={onLongPressSection}
+                    onToggleNotify={() => toggleNotify(item.id)}
+                    onEditKeywords={() => openKeywordEdit(item.id)}
+                    onRename={() => setRenameTarget(item)}
+                    onDelete={() => confirmDelete(item)}
+                    previewSlot={
+                        previews.length > 0 ? (
+                            <UnreadPreview
+                                notices={previews}
+                                totalCount={allVisible.length}
+                                accent={colors.accent}
+                            />
+                        ) : undefined
+                    }
+                />
+            </SwipeableSectionRow>
         );
     };
 
