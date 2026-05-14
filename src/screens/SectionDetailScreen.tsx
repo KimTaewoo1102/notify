@@ -12,7 +12,6 @@ import {
     Pressable,
     RefreshControl,
     ScrollView,
-    Share,
     StyleSheet,
     Text,
     View,
@@ -21,8 +20,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Card } from '../ui/primitives/Card';
 import { PressableScale } from '../ui/primitives/PressableScale';
+import { ActionPill } from '../ui/primitives/ActionPill';
 import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../ui/theme';
+import { timeAgo } from '../utils/time';
+import { shareNotice } from '../utils/share';
+import { CATEGORY_LABEL } from '../constants/categories';
+import {
+    EXTERNAL_LINK_HIT_SLOP,
+    LONG_PRESS_DELAY_MS,
+    MAX_MATCHED_KEYWORDS_DISPLAYED,
+} from '../constants/ui';
 import { useSectionsStore } from '../stores/sectionsStore';
 import { useUIStore } from '../stores/uiStore';
 import {
@@ -52,38 +60,8 @@ import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'SectionDetail'>;
 
-const CATEGORY_LABEL: Record<string, string> = {
-    academic: '학사',
-    scholarship: '장학',
-    recruit: '채용',
-    event: '행사',
-    library: '도서관',
-    dorm: '생활관',
-    general: '일반',
-};
-
 /** 노란색 핀 — 시스템 '고정' 섹션과 동일한 톤. */
 const PIN_COLOR = colors.warning;
-
-function timeAgo(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    const hours = Math.floor(diff / (60 * 60 * 1000));
-    if (hours < 1) return '방금';
-    if (hours < 24) return `${hours}시간 전`;
-    return `${Math.floor(hours / 24)}일 전`;
-}
-
-async function shareNotice(notice: Notice) {
-    try {
-        await Share.share({
-            message: `${notice.title}\n${notice.sourceUrl}`,
-            url: notice.sourceUrl,
-            title: notice.title,
-        });
-    } catch {
-        /* 사용자가 공유 시트 취소 — silent. */
-    }
-}
 
 export default function SectionDetailScreen({ navigation, route }: Props) {
     const { sectionId } = route.params;
@@ -657,7 +635,7 @@ function NoticeRow({
             <PressableScale
                 onPress={onPress}
                 onLongPress={handleLongPress}
-                delayLongPress={320}
+                delayLongPress={LONG_PRESS_DELAY_MS}
                 hapticKind={null}
                 scaleTo={0.985}
                 style={[
@@ -729,7 +707,7 @@ function NoticeRow({
                         <Text style={styles.noticeDept}>{notice.department}</Text>
                         {notice.matchedKeywords && notice.matchedKeywords.length > 0 && (
                             <View style={styles.matchedRow}>
-                                {notice.matchedKeywords.slice(0, 3).map(kw => (
+                                {notice.matchedKeywords.slice(0, MAX_MATCHED_KEYWORDS_DISPLAYED).map(kw => (
                                     <View
                                         key={kw}
                                         style={[
@@ -752,7 +730,7 @@ function NoticeRow({
                         {!selectionMode && (
                             <Pressable
                                 onPress={onOpenUrl}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 4 }}
+                                hitSlop={EXTERNAL_LINK_HIT_SLOP}
                                 style={({ pressed }) => [
                                     styles.externalIconBtn,
                                     pressed && { opacity: 0.5 },
@@ -769,49 +747,6 @@ function NoticeRow({
                 </View>
             </PressableScale>
         </View>
-    );
-}
-
-/* ────────────────────── ActionPill ────────────────────────── */
-
-function ActionPill({
-    icon,
-    label,
-    accent,
-    on,
-    onPress,
-}: {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    accent: string;
-    on: boolean;
-    onPress: () => void;
-}) {
-    return (
-        <PressableScale
-            onPress={onPress}
-            hapticKind="selection"
-            style={[
-                styles.pill,
-                on
-                    ? { backgroundColor: accent + '22', borderColor: accent + '99' }
-                    : { borderColor: colors.border },
-            ]}
-        >
-            <Ionicons
-                name={icon}
-                size={16}
-                color={on ? accent : colors.textSecondary}
-            />
-            <Text
-                style={[
-                    styles.pillLabel,
-                    { color: on ? colors.textPrimary : colors.textSecondary },
-                ]}
-            >
-                {label}
-            </Text>
-        </PressableScale>
     );
 }
 
@@ -838,17 +773,6 @@ const styles = StyleSheet.create({
     summaryMeta: { ...typography.caption, color: colors.textSecondary },
 
     pills: { flexDirection: 'row', gap: spacing.sm },
-    pill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 10,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        backgroundColor: colors.bgRaised,
-    },
-    pillLabel: { ...typography.bodySm },
 
     editBtn: {
         backgroundColor: colors.bgRaised,

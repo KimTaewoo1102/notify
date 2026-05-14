@@ -19,6 +19,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { PressableScale } from '../../../ui/primitives/PressableScale';
 import { haptic } from '../../../ui/feedback/haptics';
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
+import { SHAKE_NOTIFY_ON_SEQUENCE } from '../../../constants/animation';
 
 /** 모든 user 섹션에 동일하게 적용되는 통일 accent. 시스템 섹션은 자체 accentColor 유지. */
 const USER_ACCENT = colors.accent;
@@ -90,13 +91,15 @@ export function SectionCard({
         const isOn = section.notifyOn;
         if (wasOff && isOn && !isSystem) {
             haptic('heavy');
+            // 감쇠 시퀀스 — 진폭/duration 비율이 의도 (constants/animation.ts 참조)
+            const [s0, s1, s2, s3, s4, s5] = SHAKE_NOTIFY_ON_SEQUENCE;
             shake.value = withSequence(
-                withTiming(-7, { duration: 50 }),
-                withTiming(7, { duration: 60 }),
-                withTiming(-6, { duration: 60 }),
-                withTiming(5, { duration: 55 }),
-                withTiming(-3, { duration: 55 }),
-                withTiming(0, { duration: 70 }),
+                withTiming(s0.dx, { duration: s0.duration }),
+                withTiming(s1.dx, { duration: s1.duration }),
+                withTiming(s2.dx, { duration: s2.duration }),
+                withTiming(s3.dx, { duration: s3.duration }),
+                withTiming(s4.dx, { duration: s4.duration }),
+                withTiming(s5.dx, { duration: s5.duration }),
             );
         }
         prevNotify.current = section.notifyOn;

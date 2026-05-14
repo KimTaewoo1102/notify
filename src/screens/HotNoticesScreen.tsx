@@ -13,28 +13,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { uosAdapter } from '../services/universities/uos';
+import { timeAgo } from '../utils/time';
+import { CATEGORY_LABEL } from '../constants/categories';
 import type { Notice } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'HotNotices'>;
-
-const CATEGORY_LABEL: Record<string, string> = {
-    academic: '학사',
-    scholarship: '장학',
-    recruit: '채용',
-    event: '행사',
-    library: '도서관',
-    dorm: '생활관',
-    general: '일반',
-};
-
-function timeAgo(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    const hours = Math.floor(diff / (60 * 60 * 1000));
-    if (hours < 1) return '방금';
-    if (hours < 24) return `${hours}시간 전`;
-    return `${Math.floor(hours / 24)}일 전`;
-}
 
 function formatViewCount(n: number): string {
     if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;

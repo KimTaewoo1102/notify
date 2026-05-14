@@ -21,6 +21,7 @@ import {
     type DeletedNoticeEntry,
 } from '../stores/noticesStore';
 import { SwipeToRestoreRow } from '../features/notices/components/SwipeToRestoreRow';
+import { timeAgoFromMs } from '../utils/time';
 
 import type { RootStackScreenProps } from '../navigation/types';
 
@@ -31,15 +32,6 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 function daysLeft(deletedAt: number): number {
     const expiry = deletedAt + THIRTY_DAYS_MS;
     return Math.max(0, Math.ceil((expiry - Date.now()) / (24 * 60 * 60 * 1000)));
-}
-
-function timeAgo(deletedAt: number): string {
-    const diff = Date.now() - deletedAt;
-    const hours = Math.floor(diff / (60 * 60 * 1000));
-    if (hours < 1) return '방금 전';
-    if (hours < 24) return `${hours}시간 전`;
-    const days = Math.floor(hours / 24);
-    return `${days}일 전`;
 }
 
 /* 통합 Trash row 모델 — section 과 notice 를 하나의 리스트로 정렬해 보여준다. */
@@ -267,7 +259,7 @@ function SectionTrashCard({
                     <Text style={styles.meta} numberOfLines={1}>
                         키워드 {payload.keywords.length}
                         <Text style={styles.metaDim}> · </Text>
-                        {timeAgo(entry.deletedAt)} 삭제
+                        {timeAgoFromMs(entry.deletedAt)} 삭제
                         <Text style={styles.metaDim}> · </Text>
                         <Text style={urgent ? styles.metaUrgent : styles.metaDim}>
                             {remaining}일 후 만료
@@ -324,7 +316,7 @@ function NoticeTrashCard({
                     <Text style={styles.meta} numberOfLines={1}>
                         {payload.department}
                         <Text style={styles.metaDim}> · </Text>
-                        {timeAgo(entry.deletedAt)} 삭제
+                        {timeAgoFromMs(entry.deletedAt)} 삭제
                         <Text style={styles.metaDim}> · </Text>
                         <Text style={urgent ? styles.metaUrgent : styles.metaDim}>
                             {remaining}일 후 만료

@@ -9,6 +9,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
+import { runAfterFrame } from '../../../utils/nextFrame';
 
 export interface SectionMenuItem {
     key: string;
@@ -61,7 +62,7 @@ export function SectionCardMenu({ visible, anchor, items, onClose }: Props) {
                                 key={it.key}
                                 onPress={() => {
                                     onClose();
-                                    requestAnimationFrame(it.onPress);
+                                    runAfterFrame(it.onPress);
                                 }}
                                 style={({ pressed }) => [
                                     styles.item,

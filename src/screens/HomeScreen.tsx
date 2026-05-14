@@ -46,6 +46,7 @@ import { useNoticeCacheStore } from '../stores/noticeCacheStore';
 import { useTrashStore } from '../stores/trashStore';
 import { useUIStore } from '../stores/uiStore';
 import { uosAdapter } from '../services/universities/uos';
+import { timeAgoShort } from '../utils/time';
 import type { Notice, Section } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
@@ -544,14 +545,6 @@ const hotStyles = StyleSheet.create({
 });
 
 /* ──────────────────── UnreadPreview ───────────────────────── */
-
-function timeAgoShort(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    const hours = Math.floor(diff / (60 * 60 * 1000));
-    if (hours < 1) return '방금';
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
-}
 
 function UnreadPreview({
     notices,
