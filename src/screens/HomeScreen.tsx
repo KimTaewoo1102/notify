@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -27,7 +27,10 @@ import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { EditDoneButton } from '../features/home/EditDoneButton';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
-import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
+import {
+    SwipeableSectionRow,
+    type SwipeableSectionRowHandle,
+} from '../features/sections/components/SwipeableSectionRow';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
 import { RenameSectionModal } from '../features/sections/components/RenameSectionModal';
 import {
@@ -71,6 +74,43 @@ export default function HomeScreen({ navigation }: Props) {
 
     const [renameTarget, setRenameTarget] = useState<Section | null>(null);
     const [hotNotice, setHotNotice] = useState<Notice | null>(null);
+
+    /* ─── 섹션 스와이프 row 외부 터치 닫기 ── */
+    const rowHandles = useRef<Map<string, SwipeableSectionRowHandle>>(new Map());
+    const openSectionIdRef = useRef<string | null>(null);
+
+    const closeOpenSection = useCallback(() => {
+        if (openSectionIdRef.current) {
+            rowHandles.current.get(openSectionIdRef.current)?.close();
+            openSectionIdRef.current = null;
+        }
+    }, []);
+
+    /* ─── 동적 정렬: 새 공지 있는 섹션을 상단으로 ── */
+    const displaySections = useMemo(() => {
+        if (editMode) return userSections;
+        return [...userSections].sort((a, b) => {
+            const aLv = a.lastVisitedAt;
+            const bLv = b.lastVisitedAt;
+            const aCache = (noticeCache[a.id] ?? []).filter(n => !deletedIds.has(n.id));
+            const bCache = (noticeCache[b.id] ?? []).filter(n => !deletedIds.has(n.id));
+            const aUnread = aLv !== null
+                ? aCache.filter(n => new Date(n.publishedAt).getTime() > aLv)
+                : [];
+            const bUnread = bLv !== null
+                ? bCache.filter(n => new Date(n.publishedAt).getTime() > bLv)
+                : [];
+            const aHas = aUnread.length > 0;
+            const bHas = bUnread.length > 0;
+            if (aHas !== bHas) return aHas ? -1 : 1;
+            if (aHas && bHas) {
+                const aLatest = Math.max(...aUnread.map(n => new Date(n.publishedAt).getTime()));
+                const bLatest = Math.max(...bUnread.map(n => new Date(n.publishedAt).getTime()));
+                return bLatest - aLatest;
+            }
+            return 0; // unread 없는 섹션끼리는 사용자 지정 순서 유지
+        });
+    }, [editMode, userSections, noticeCache, deletedIds]);
 
     /* ─── HOT 공지 #1 fetch ── */
     useEffect(() => {
@@ -170,7 +210,7 @@ export default function HomeScreen({ navigation }: Props) {
                         pressed && headerBtnStyles.pressed,
                     ]}
                 >
-                    <Ionicons name="menu-outline" size={22} color={colors.textPrimary} />
+                    <Ionicons name="apps-outline" size={22} color={colors.textPrimary} />
                 </Pressable>
             ),
             headerRight: () => (
@@ -254,9 +294,19 @@ export default function HomeScreen({ navigation }: Props) {
 
         return (
             <SwipeableSectionRow
+                ref={(handle) => {
+                    if (handle) rowHandles.current.set(item.id, handle);
+                    else rowHandles.current.delete(item.id);
+                }}
                 onDelete={() => confirmDelete(item)}
                 onToggleNotify={() => toggleNotify(item.id)}
                 notifyOn={item.notifyOn}
+                onOpen={() => {
+                    if (openSectionIdRef.current && openSectionIdRef.current !== item.id) {
+                        rowHandles.current.get(openSectionIdRef.current)?.close();
+                    }
+                    openSectionIdRef.current = item.id;
+                }}
             >
                 <SectionCard
                     section={item}
@@ -300,7 +350,13 @@ export default function HomeScreen({ navigation }: Props) {
     const renderAddSlot = () => <AddSectionSlot onPress={openAdd} />;
 
     return (
-        <View style={styles.root}>
+        <View
+            style={styles.root}
+            onTouchStart={() => {
+                // 빈 공간 또는 카드 외부 탭 시 열린 row 닫기
+                if (openSectionIdRef.current !== null) closeOpenSection();
+            }}
+        >
             {editMode ? (
                 <DraggableFlatList<Section>
                     data={userSections}
@@ -341,11 +397,12 @@ export default function HomeScreen({ navigation }: Props) {
                 />
             ) : (
                 <FlatList
-                    data={userSections}
+                    data={displaySections}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.list}
                     ListHeaderComponent={renderPinHeader}
                     ListFooterComponent={renderAddSlot}
+                    onScrollBeginDrag={closeOpenSection}
                     renderItem={({ item }) => renderUserRow(item)}
                 />
             )}
