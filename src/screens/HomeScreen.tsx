@@ -152,6 +152,18 @@ export default function HomeScreen({ navigation }: Props) {
 
     useLayoutEffect(() => {
         navigation.setOptions({
+            headerLeft: () => (
+                <Pressable
+                    onPress={() => navigation.navigate('Trash')}
+                    hitSlop={12}
+                    style={({ pressed }) => [
+                        headerBtnStyles.btn,
+                        pressed && headerBtnStyles.pressed,
+                    ]}
+                >
+                    <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                </Pressable>
+            ),
             headerRight: () =>
                 userSections.length > 0 ? (
                     <EditDoneButton
@@ -630,4 +642,14 @@ const styles = StyleSheet.create({
         color: colors.textMuted,
         textAlign: 'center',
     },
+});
+
+const headerBtnStyles = StyleSheet.create({
+    btn: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pressed: { opacity: 0.5 },
 });
