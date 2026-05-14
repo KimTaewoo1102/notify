@@ -27,6 +27,7 @@ import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { EditDoneButton } from '../features/home/EditDoneButton';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
+import { SwipeableSectionRow } from '../features/sections/components/SwipeableSectionRow';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
 import { RenameSectionModal } from '../features/sections/components/RenameSectionModal';
 import {
@@ -154,23 +155,44 @@ export default function HomeScreen({ navigation }: Props) {
         navigation.setOptions({
             headerLeft: () => (
                 <Pressable
-                    onPress={() => navigation.navigate('Trash')}
+                    onPress={() =>
+                        Alert.alert('메뉴', '', [
+                            {
+                                text: '휴지통',
+                                onPress: () => navigation.navigate('Trash'),
+                            },
+                            { text: '취소', style: 'cancel' },
+                        ])
+                    }
                     hitSlop={12}
                     style={({ pressed }) => [
                         headerBtnStyles.btn,
                         pressed && headerBtnStyles.pressed,
                     ]}
                 >
-                    <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                    <Ionicons name="menu-outline" size={22} color={colors.textPrimary} />
                 </Pressable>
             ),
-            headerRight: () =>
-                userSections.length > 0 ? (
-                    <EditDoneButton
-                        editMode={editMode}
-                        onToggle={() => setEditMode(!editMode)}
-                    />
-                ) : null,
+            headerRight: () => (
+                <View style={headerBtnStyles.rightRow}>
+                    <Pressable
+                        onPress={() => navigation.navigate('Trash')}
+                        hitSlop={12}
+                        style={({ pressed }) => [
+                            headerBtnStyles.btn,
+                            pressed && headerBtnStyles.pressed,
+                        ]}
+                    >
+                        <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                    </Pressable>
+                    {userSections.length > 0 && (
+                        <EditDoneButton
+                            editMode={editMode}
+                            onToggle={() => setEditMode(!editMode)}
+                        />
+                    )}
+                </View>
+            ),
         });
     }, [navigation, editMode, userSections.length, setEditMode]);
 
@@ -231,26 +253,32 @@ export default function HomeScreen({ navigation }: Props) {
             .slice(0, 2);
 
         return (
-            <SectionCard
-                section={item}
-                totalNoticeCount={noticeCountCache[item.id]}
-                unreadCount={unread}
-                onPress={() => onPressSection(item)}
-                onLongPress={onLongPressSection}
-                onToggleNotify={() => toggleNotify(item.id)}
-                onEditKeywords={() => openKeywordEdit(item.id)}
-                onRename={() => setRenameTarget(item)}
+            <SwipeableSectionRow
                 onDelete={() => confirmDelete(item)}
-                previewSlot={
-                    previews.length > 0 ? (
-                        <UnreadPreview
-                            notices={previews}
-                            totalCount={allVisible.length}
-                            accent={colors.accent}
-                        />
-                    ) : undefined
-                }
-            />
+                onToggleNotify={() => toggleNotify(item.id)}
+                notifyOn={item.notifyOn}
+            >
+                <SectionCard
+                    section={item}
+                    totalNoticeCount={noticeCountCache[item.id]}
+                    unreadCount={unread}
+                    onPress={() => onPressSection(item)}
+                    onLongPress={onLongPressSection}
+                    onToggleNotify={() => toggleNotify(item.id)}
+                    onEditKeywords={() => openKeywordEdit(item.id)}
+                    onRename={() => setRenameTarget(item)}
+                    onDelete={() => confirmDelete(item)}
+                    previewSlot={
+                        previews.length > 0 ? (
+                            <UnreadPreview
+                                notices={previews}
+                                totalCount={allVisible.length}
+                                accent={colors.accent}
+                            />
+                        ) : undefined
+                    }
+                />
+            </SwipeableSectionRow>
         );
     };
 
@@ -645,6 +673,11 @@ const styles = StyleSheet.create({
 });
 
 const headerBtnStyles = StyleSheet.create({
+    rightRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
     btn: {
         width: 32,
         height: 32,
