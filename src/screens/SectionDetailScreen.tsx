@@ -394,6 +394,8 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                     ) : undefined
                 }
             >
+                {/* 빈 공간 탭 → 열린 스와이프 row 닫기. 자식 Pressable이 먼저 소비하므로 카드 탭에는 미발동 */}
+                <Pressable onPress={closeOpenRow} style={styles.tapToDismiss}>
                 {/* 시스템 섹션(고정)은 상단 요약 카드만 표시 */}
                 {isSystemPin && (
                     <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
@@ -590,6 +592,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                         })
                     )}
                 </View>
+                </Pressable>
             </ScrollView>
 
             <SelectionActionBar
@@ -813,6 +816,7 @@ function ActionPill({
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
     content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
+    tapToDismiss: { flex: 1 },
     muted: {
         ...typography.body,
         color: colors.textMuted,
