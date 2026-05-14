@@ -398,7 +398,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 <Pressable onPress={closeOpenRow} style={styles.tapToDismiss}>
                 {/* 시스템 섹션(고정)은 상단 요약 카드만 표시 */}
                 {isSystemPin && (
-                    <Card accent={accent} showAccentLine shadow="md" style={styles.summary}>
+                    <Card accent={accent} shadow="md" style={styles.summary}>
                         <View style={styles.summaryHead}>
                             <Ionicons name="pin" size={16} color={accent} />
                             <Text style={styles.summaryTitle}>고정한 공지</Text>
@@ -820,7 +820,7 @@ function ActionPill({
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
     content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
-    tapToDismiss: { flex: 1 },
+    tapToDismiss: { flex: 1, gap: spacing.md },
     muted: {
         ...typography.body,
         color: colors.textMuted,
