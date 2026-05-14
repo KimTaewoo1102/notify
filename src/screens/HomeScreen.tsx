@@ -155,23 +155,44 @@ export default function HomeScreen({ navigation }: Props) {
         navigation.setOptions({
             headerLeft: () => (
                 <Pressable
-                    onPress={() => navigation.navigate('Trash')}
+                    onPress={() =>
+                        Alert.alert('메뉴', '', [
+                            {
+                                text: '휴지통',
+                                onPress: () => navigation.navigate('Trash'),
+                            },
+                            { text: '취소', style: 'cancel' },
+                        ])
+                    }
                     hitSlop={12}
                     style={({ pressed }) => [
                         headerBtnStyles.btn,
                         pressed && headerBtnStyles.pressed,
                     ]}
                 >
-                    <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                    <Ionicons name="menu-outline" size={22} color={colors.textPrimary} />
                 </Pressable>
             ),
-            headerRight: () =>
-                userSections.length > 0 ? (
-                    <EditDoneButton
-                        editMode={editMode}
-                        onToggle={() => setEditMode(!editMode)}
-                    />
-                ) : null,
+            headerRight: () => (
+                <View style={headerBtnStyles.rightRow}>
+                    <Pressable
+                        onPress={() => navigation.navigate('Trash')}
+                        hitSlop={12}
+                        style={({ pressed }) => [
+                            headerBtnStyles.btn,
+                            pressed && headerBtnStyles.pressed,
+                        ]}
+                    >
+                        <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                    </Pressable>
+                    {userSections.length > 0 && (
+                        <EditDoneButton
+                            editMode={editMode}
+                            onToggle={() => setEditMode(!editMode)}
+                        />
+                    )}
+                </View>
+            ),
         });
     }, [navigation, editMode, userSections.length, setEditMode]);
 
@@ -652,6 +673,11 @@ const styles = StyleSheet.create({
 });
 
 const headerBtnStyles = StyleSheet.create({
+    rightRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
     btn: {
         width: 32,
         height: 32,
