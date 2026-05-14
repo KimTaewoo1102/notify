@@ -271,6 +271,15 @@ export function SectionCard({
                                     >
                                         {section.title}
                                     </Text>
+                                    {/* 알림 OFF일 때만 타이틀 옆에 뮤트 아이콘 표시 */}
+                                    {!isSystem && !section.notifyOn && (
+                                        <Ionicons
+                                            name="notifications-off"
+                                            size={12}
+                                            color={colors.textDisabled}
+                                            style={styles.mutedIcon}
+                                        />
+                                    )}
                                 </View>
                                 <Text style={styles.meta} numberOfLines={1}>
                                     {isSystem ? (
@@ -326,13 +335,6 @@ export function SectionCard({
                                                 {badgeLabel}
                                             </Text>
                                         </View>
-                                    )}
-                                    {!isSystem && (
-                                        <Ionicons
-                                            name={section.notifyOn ? 'notifications' : 'notifications-off'}
-                                            size={15}
-                                            color={section.notifyOn ? colors.textSecondary : colors.textDisabled}
-                                        />
                                     )}
                                     {showKebab ? (
                                         <Pressable
@@ -442,13 +444,14 @@ const styles = StyleSheet.create({
     body: { flex: 1 },
     titleRow: { flexDirection: 'row', alignItems: 'center' },
     pinIcon: { marginRight: 4 },
+    mutedIcon: { marginLeft: 4, flexShrink: 0 },
     systemLeadingIcon: { marginTop: -1 },
     title: { ...typography.body, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
     systemTitle: { letterSpacing: 0.2 },
     meta: {
-        ...typography.caption,
-        fontWeight: '600',
-        color: 'rgba(245,245,247,0.80)',
+        fontSize: 10,
+        fontWeight: '500',
+        color: 'rgba(245,245,247,0.50)',
         marginTop: 2,
     },
     metaDim: { color: colors.textMuted },
