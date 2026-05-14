@@ -662,6 +662,10 @@ function NoticeRow({
                 scaleTo={0.985}
                 style={[
                     styles.noticeCard,
+                    isNew && !selectionMode && !pinned && {
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        borderColor: 'rgba(255,255,255,0.12)',
+                    },
                     pinned && !selectionMode && {
                         borderColor: PIN_COLOR + '66',
                         backgroundColor: PIN_COLOR + '0E',
