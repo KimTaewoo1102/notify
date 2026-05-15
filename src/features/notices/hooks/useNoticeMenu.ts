@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import type { Notice } from '../../../types/domain';
 import type { NoticeMenuAnchor } from '../components/NoticeContextMenu';
 
-export interface NoticeMenuTarget {
+interface NoticeMenuTarget {
     notice: Notice;
     anchor: NoticeMenuAnchor;
 }

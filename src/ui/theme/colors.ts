@@ -53,14 +53,3 @@ export const alpha = {
     /** 60% — 활성 pill 테두리 */
     strong: '99',
 } as const;
-
-export type AlphaToken = keyof typeof alpha;
-
-/**
- * `color + alphaHex` 의 의미를 명시적으로 표현하는 헬퍼.
- * 호출 측에서 `accent + alpha.fill` 만으로도 충분하지만,
- * 가독성을 위해 헬퍼가 필요한 경우 사용한다.
- */
-export function withAlpha(color: string, alphaHex: string): string {
-    return color + alphaHex;
-}
