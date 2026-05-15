@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import type { ID, Section } from '../types/domain';
+import { generateId } from '../utils/id';
 import { STORAGE_PREFIX, rnStorage } from './persist/asyncStorage';
 
 export interface TrashEntry {
@@ -35,7 +36,10 @@ export const useTrashStore = create<TrashStore>()(
                 set(s => ({
                     entries: [
                         {
-                            id: `${section.id}:${Date.now()}`,
+                            // 컬리전 회피용 random id. 같은 ms 에 두 번 삭제해도 안전.
+                            // (이전 포맷 `${section.id}:${Date.now()}` 와 string 호환,
+                            //  기존 persist 엔트리도 그대로 동작.)
+                            id: generateId(),
                             payload: section,
                             deletedAt: Date.now(),
                         },
