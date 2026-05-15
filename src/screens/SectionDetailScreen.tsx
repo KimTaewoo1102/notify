@@ -1,11 +1,4 @@
-import React, {
-    useCallback,
-    useEffect,
-    useLayoutEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Linking,
@@ -23,14 +16,7 @@ import { PressableScale } from '../ui/primitives/PressableScale';
 import { ActionPill } from '../ui/primitives/ActionPill';
 import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../ui/theme';
-import { timeAgo } from '../utils/time';
 import { shareNotice } from '../utils/share';
-import { CATEGORY_LABEL } from '../constants/categories';
-import {
-    EXTERNAL_LINK_HIT_SLOP,
-    LONG_PRESS_DELAY_MS,
-    MAX_MATCHED_KEYWORDS_DISPLAYED,
-} from '../constants/ui';
 import { useSectionsStore } from '../stores/sectionsStore';
 import { useUIStore } from '../stores/uiStore';
 import {
@@ -43,25 +29,23 @@ import {
 import { SectionTrashButton } from '../features/notices/components/SectionTrashButton';
 import { SelectionActionBar } from '../features/notices/components/SelectionActionBar';
 import { NoticeBulkDeleteModal } from '../features/notices/components/NoticeBulkDeleteModal';
-import {
-    SwipeableNoticeRow,
-    type SwipeableNoticeRowHandle,
-} from '../features/notices/components/SwipeableNoticeRow';
+import { SwipeableNoticeRow } from '../features/notices/components/SwipeableNoticeRow';
 import {
     NoticeContextMenu,
-    type NoticeMenuAnchor,
     type NoticeMenuItem,
 } from '../features/notices/components/NoticeContextMenu';
+import { NoticeRow } from '../features/notices/components/NoticeRow';
+import { useSwipeRowManager } from '../features/notices/hooks/useSwipeRowManager';
+import { useNewNoticeDetection } from '../features/notices/hooks/useNewNoticeDetection';
+import { useNoticeSelection } from '../features/notices/hooks/useNoticeSelection';
+import { useNoticeMenu } from '../features/notices/hooks/useNoticeMenu';
 import { useNoticeCacheStore } from '../stores/noticeCacheStore';
 import { uosAdapter } from '../services/universities/uos';
-import type { Notice, ID } from '../types/domain';
+import type { Notice } from '../types/domain';
 import { SYSTEM_PIN_SECTION_ID } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'SectionDetail'>;
-
-/** 노란색 핀 — 시스템 '고정' 섹션과 동일한 톤. */
-const PIN_COLOR = colors.warning;
 
 export default function SectionDetailScreen({ navigation, route }: Props) {
     const { sectionId } = route.params;
@@ -74,15 +58,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     const openKeywordEdit = useUIStore(s => s.openKeywordEdit);
     const setNoticeCache = useNoticeCacheStore(s => s.setCache);
 
-    // 화면 진입 시점의 lastVisitedAt 스냅샷 — 이 시점 기준으로 "신규" 판별.
-    // section이 처음 로드될 때 한 번만 캡처 (ref 사용).
-    const entryLastVisitedAt = useRef<number | null>(null);
-    useEffect(() => {
-        if (entryLastVisitedAt.current === null && section) {
-            entryLastVisitedAt.current = section.lastVisitedAt ?? null;
-        }
-    }, [section]);
-
     const markManyDeleted = useNoticesStore(s => s.markManyDeleted);
     const togglePinNotice = useNoticesStore(s => s.togglePin);
     const unpinNotice = useNoticesStore(s => s.unpin);
@@ -94,33 +69,18 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     const [allNotices, setAllNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
-
-    /* ─── 선택 모드 ───────────────────────────────────── */
-    const [selectionMode, setSelectionMode] = useState(false);
-    const [selected, setSelected] = useState<Set<ID>>(new Set());
     const [confirmOpen, setConfirmOpen] = useState(false);
 
-    /* ─── Context menu (long-press) ──────────────────── */
-    const [menuTarget, setMenuTarget] = useState<{
-        notice: Notice;
-        anchor: NoticeMenuAnchor;
-    } | null>(null);
-
-    /* ─── 스와이프 row 외부 터치 닫기 ──────────────────── */
-    const rowHandles = useRef<Map<ID, SwipeableNoticeRowHandle>>(new Map());
-    const openRowIdRef = useRef<ID | null>(null);
-
-    const closeOpenRow = useCallback(() => {
-        if (openRowIdRef.current) {
-            rowHandles.current.get(openRowIdRef.current)?.close();
-            openRowIdRef.current = null;
-        }
-    }, []);
-
-    const exitSelection = useCallback(() => {
-        setSelectionMode(false);
-        setSelected(new Set());
-    }, []);
+    const isNewNotice = useNewNoticeDetection(section);
+    const swipe = useSwipeRowManager();
+    const {
+        selectionMode,
+        selected,
+        toggleSelected,
+        enterSelection,
+        exitSelection,
+    } = useNoticeSelection();
+    const { menuTarget, openMenu, closeMenu } = useNoticeMenu();
 
     /* 시스템 '고정' 섹션 — pinned 공지를 그대로 사용. 일반 섹션 — 어댑터 fetch. */
     const pinnedNoticesForSystem = useMemo(
@@ -203,21 +163,11 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         isSystemPin,
     ]);
 
-    /* ─── 선택 토글 ───────────────────────────────────── */
-    const toggleSelected = useCallback((id: ID) => {
-        setSelected(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    }, []);
-
     const onPressNotice = useCallback(
         (n: Notice) => {
             // 스와이프가 열려 있으면 닫고 탭을 소비 (이동하지 않음)
-            if (openRowIdRef.current !== null) {
-                closeOpenRow();
+            if (swipe.isAnyOpen()) {
+                swipe.closeOpenRow();
                 return;
             }
             if (selectionMode) {
@@ -225,33 +175,30 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 toggleSelected(n.id);
             }
         },
-        [selectionMode, toggleSelected, closeOpenRow],
+        [selectionMode, toggleSelected, swipe],
     );
 
     /** 외부 링크 아이콘 전용 핸들러 — 카드 전체 탭이 아닌 아이콘에서만 호출 */
     const onOpenNoticeUrl = useCallback(
         (n: Notice) => {
-            closeOpenRow();
+            swipe.closeOpenRow();
             haptic('light');
             Linking.openURL(n.sourceUrl).catch(() => {});
         },
-        [closeOpenRow],
+        [swipe],
     );
 
-    /* ─── Context menu trigger ───────────────────────── */
     const onLongPressNotice = useCallback(
-        (notice: Notice, anchor: NoticeMenuAnchor) => {
+        (notice: Notice, anchor: Parameters<typeof openMenu>[1]) => {
             if (selectionMode) return;
-            closeOpenRow();
+            swipe.closeOpenRow();
             haptic('medium');
-            setMenuTarget({ notice, anchor });
+            openMenu(notice, anchor);
         },
-        [selectionMode, closeOpenRow],
+        [selectionMode, swipe, openMenu],
     );
 
-    const closeMenu = useCallback(() => setMenuTarget(null), []);
-
-    /* ─── 개별 공지 스와이프 삭제 (#6) ────────────────── */
+    /* ─── 개별 공지 스와이프 삭제 ──────────────────────── */
     const deleteNotice = useCallback(
         (notice: Notice) => {
             const src = isSystemPin
@@ -289,12 +236,12 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         if (!menuTarget) return [];
         const notice = menuTarget.notice;
         const isPinned = pinnedIds.has(notice.id);
-        const items: NoticeMenuItem[] = [
+        return [
             {
                 key: 'pin',
                 label: isPinned ? '고정 해제' : '고정',
                 icon: isPinned ? 'pin' : 'pin-outline',
-                iconColor: isPinned ? PIN_COLOR : colors.textSecondary,
+                iconColor: isPinned ? colors.warning : colors.textSecondary,
                 onPress: () => {
                     if (isPinned) {
                         unpinNotice(notice.id);
@@ -315,10 +262,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 key: 'select',
                 label: '선택',
                 icon: 'checkmark-circle-outline',
-                onPress: () => {
-                    setSelectionMode(true);
-                    setSelected(new Set([notice.id]));
-                },
+                onPress: () => enterSelection(notice.id),
             },
             {
                 key: 'delete',
@@ -334,7 +278,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 },
             },
         ];
-        return items;
     }, [
         menuTarget,
         pinnedIds,
@@ -343,6 +286,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         markManyDeleted,
         sectionId,
         isSystemPin,
+        enterSelection,
     ]);
 
     if (!section) {
@@ -356,11 +300,32 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     const accent = section.accentColor;
     const showSectionControls = !isSystemPin;
 
+    const renderNoticeItem = (notice: Notice, isNew: boolean) => (
+        <SwipeableNoticeRow
+            key={notice.id}
+            ref={handle => swipe.registerHandle(notice.id, handle)}
+            onDelete={() => deleteNotice(notice)}
+            onReveal={() => swipe.handleReveal(notice.id)}
+        >
+            <NoticeRow
+                notice={notice}
+                accent={accent}
+                pinned={pinnedIds.has(notice.id)}
+                selectionMode={selectionMode}
+                isSelected={selected.has(notice.id)}
+                isNew={isNew}
+                onPress={() => onPressNotice(notice)}
+                onLongPress={anchor => onLongPressNotice(notice, anchor)}
+                onOpenUrl={() => onOpenNoticeUrl(notice)}
+            />
+        </SwipeableNoticeRow>
+    );
+
     return (
         <View style={styles.root}>
             <ScrollView
                 contentContainerStyle={styles.content}
-                onScrollBeginDrag={closeOpenRow}
+                onScrollBeginDrag={swipe.closeOpenRow}
                 refreshControl={
                     !isSystemPin ? (
                         <RefreshControl
@@ -373,7 +338,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 }
             >
                 {/* 빈 공간 탭 → 열린 스와이프 row 닫기. 자식 Pressable이 먼저 소비하므로 카드 탭에는 미발동 */}
-                <Pressable onPress={closeOpenRow} style={styles.tapToDismiss}>
+                <Pressable onPress={swipe.closeOpenRow} style={styles.tapToDismiss}>
                 {/* 시스템 섹션(고정)은 상단 요약 카드만 표시 */}
                 {isSystemPin && (
                     <Card accent={accent} shadow="md" style={styles.summary}>
@@ -389,7 +354,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
                 {showSectionControls && (
                     <>
-                        {/* 알림 ON/OFF 버튼 (핀 버튼은 제거 #7) */}
+                        {/* 알림 ON/OFF 버튼 */}
                         <View style={styles.pills}>
                             <ActionPill
                                 icon={section.notifyOn ? 'notifications' : 'notifications-off'}
@@ -400,7 +365,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                             />
                         </View>
 
-                        {/* 키워드 편집 카드 — 현재 키워드 칩 표시 (#9) */}
+                        {/* 키워드 편집 카드 — 현재 키워드 칩 표시 */}
                         <PressableScale
                             onPress={() => openKeywordEdit(section.id)}
                             hapticKind="light"
@@ -476,36 +441,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                                 </Text>
                             </View>
                         ) : (
-                            notices.map(notice => (
-                                <SwipeableNoticeRow
-                                    key={notice.id}
-                                    ref={(handle) => {
-                                        if (handle) rowHandles.current.set(notice.id, handle);
-                                        else rowHandles.current.delete(notice.id);
-                                    }}
-                                    onDelete={() => deleteNotice(notice)}
-                                    onReveal={() => {
-                                        if (openRowIdRef.current && openRowIdRef.current !== notice.id) {
-                                            rowHandles.current.get(openRowIdRef.current)?.close();
-                                        }
-                                        openRowIdRef.current = notice.id;
-                                    }}
-                                >
-                                    <NoticeRow
-                                        notice={notice}
-                                        accent={accent}
-                                        pinned={pinnedIds.has(notice.id)}
-                                        selectionMode={selectionMode}
-                                        isSelected={selected.has(notice.id)}
-                                        isNew={false}
-                                        onPress={() => onPressNotice(notice)}
-                                        onLongPress={(anchor) =>
-                                            onLongPressNotice(notice, anchor)
-                                        }
-                                        onOpenUrl={() => onOpenNoticeUrl(notice)}
-                                    />
-                                </SwipeableNoticeRow>
-                            ))
+                            notices.map(notice => renderNoticeItem(notice, false))
                         )
                     ) : section.keywords.length === 0 ? (
                         <View style={styles.noKeywords}>
@@ -532,42 +468,9 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                             </Text>
                         </View>
                     ) : (
-                        notices.map(notice => {
-                            const lv = entryLastVisitedAt.current;
-                            const isNew =
-                                lv !== null &&
-                                new Date(notice.publishedAt).getTime() > lv;
-                            return (
-                                <SwipeableNoticeRow
-                                    key={notice.id}
-                                    ref={(handle) => {
-                                        if (handle) rowHandles.current.set(notice.id, handle);
-                                        else rowHandles.current.delete(notice.id);
-                                    }}
-                                    onDelete={() => deleteNotice(notice)}
-                                    onReveal={() => {
-                                        if (openRowIdRef.current && openRowIdRef.current !== notice.id) {
-                                            rowHandles.current.get(openRowIdRef.current)?.close();
-                                        }
-                                        openRowIdRef.current = notice.id;
-                                    }}
-                                >
-                                    <NoticeRow
-                                        notice={notice}
-                                        accent={accent}
-                                        pinned={pinnedIds.has(notice.id)}
-                                        selectionMode={selectionMode}
-                                        isSelected={selected.has(notice.id)}
-                                        isNew={isNew}
-                                        onPress={() => onPressNotice(notice)}
-                                        onLongPress={(anchor) =>
-                                            onLongPressNotice(notice, anchor)
-                                        }
-                                        onOpenUrl={() => onOpenNoticeUrl(notice)}
-                                    />
-                                </SwipeableNoticeRow>
-                            );
-                        })
+                        notices.map(notice =>
+                            renderNoticeItem(notice, isNewNotice(notice.publishedAt)),
+                        )
                     )}
                 </View>
                 </Pressable>
@@ -596,161 +499,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         </View>
     );
 }
-
-/* ────────────────────── NoticeRow ─────────────────────────── */
-
-function NoticeRow({
-    notice,
-    accent,
-    pinned,
-    selectionMode,
-    isSelected,
-    isNew,
-    onPress,
-    onLongPress,
-    onOpenUrl,
-}: {
-    notice: Notice;
-    accent: string;
-    pinned: boolean;
-    selectionMode: boolean;
-    isSelected: boolean;
-    isNew: boolean;
-    onPress: () => void;
-    onLongPress: (anchor: NoticeMenuAnchor) => void;
-    /** 외부 링크 아이콘 전용 핸들러 — 카드 전체가 아닌 아이콘에서만 URL을 엽니다 */
-    onOpenUrl: () => void;
-}) {
-    /** 카드 위치 측정 → 컨텍스트 메뉴 anchor. */
-    const ref = useRef<View>(null);
-
-    const handleLongPress = () => {
-        ref.current?.measureInWindow((x, y, width, height) => {
-            onLongPress({ top: y, left: x, width, height });
-        });
-    };
-
-    return (
-        <View ref={ref} collapsable={false}>
-            <PressableScale
-                onPress={onPress}
-                onLongPress={handleLongPress}
-                delayLongPress={LONG_PRESS_DELAY_MS}
-                hapticKind={null}
-                scaleTo={0.985}
-                style={[
-                    styles.noticeCard,
-                    isNew && !selectionMode && !pinned && {
-                        backgroundColor: 'rgba(255,255,255,0.06)',
-                        borderColor: 'rgba(255,255,255,0.12)',
-                    },
-                    pinned && !selectionMode && {
-                        borderColor: PIN_COLOR + '66',
-                        backgroundColor: PIN_COLOR + '0E',
-                    },
-                    selectionMode && isSelected && {
-                        borderColor: accent,
-                        backgroundColor: accent + '14',
-                    },
-                ]}
-            >
-                {selectionMode && (
-                    <View
-                        style={[
-                            styles.checkbox,
-                            isSelected && {
-                                backgroundColor: accent,
-                                borderColor: accent,
-                            },
-                        ]}
-                    >
-                        {isSelected && (
-                            <Ionicons name="checkmark" size={14} color="#fff" />
-                        )}
-                    </View>
-                )}
-
-                <View style={styles.noticeBodyWrap}>
-                    <View style={styles.noticeTop}>
-                        <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
-                            <Text style={[styles.tagText, { color: accent }]}>
-                                {CATEGORY_LABEL[notice.category] ?? notice.category}
-                            </Text>
-                        </View>
-                        {/* 신규 공지 — 미니멀 'N' 뱃지 (테두리 대신 은은한 pill) */}
-                        {isNew && !selectionMode && !pinned && (
-                            <View style={styles.newBadge}>
-                                <Text style={styles.newBadgeText}>N</Text>
-                            </View>
-                        )}
-                        {notice.isSourcePinned && (
-                            <Ionicons name="pin" size={11} color={accent} style={styles.pinIcon} />
-                        )}
-                        <Text style={styles.noticeTime}>{timeAgo(notice.publishedAt)}</Text>
-                    </View>
-
-                    <View style={styles.titleRow}>
-                        {pinned && (
-                            <Ionicons
-                                name="pin"
-                                size={13}
-                                color={PIN_COLOR}
-                                style={styles.userPinIcon}
-                            />
-                        )}
-                        <Text style={styles.noticeTitle} numberOfLines={2}>
-                            {notice.title}
-                        </Text>
-                    </View>
-
-                    <View style={styles.noticeBottom}>
-                        <Text style={styles.noticeDept}>{notice.department}</Text>
-                        {notice.matchedKeywords && notice.matchedKeywords.length > 0 && (
-                            <View style={styles.matchedRow}>
-                                {notice.matchedKeywords.slice(0, MAX_MATCHED_KEYWORDS_DISPLAYED).map(kw => (
-                                    <View
-                                        key={kw}
-                                        style={[
-                                            styles.matchChip,
-                                            { backgroundColor: accent + '18' },
-                                        ]}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.matchChipText,
-                                                { color: accent },
-                                            ]}
-                                        >
-                                            {kw}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                        {!selectionMode && (
-                            <Pressable
-                                onPress={onOpenUrl}
-                                hitSlop={EXTERNAL_LINK_HIT_SLOP}
-                                style={({ pressed }) => [
-                                    styles.externalIconBtn,
-                                    pressed && { opacity: 0.5 },
-                                ]}
-                            >
-                                <Ionicons
-                                    name="open-outline"
-                                    size={13}
-                                    color={colors.textMuted}
-                                />
-                            </Pressable>
-                        )}
-                    </View>
-                </View>
-            </PressableScale>
-        </View>
-    );
-}
-
-/* ───────────────────────── styles ─────────────────────────── */
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
@@ -794,7 +542,6 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     editBadgeText: { ...typography.caption, fontWeight: '700' },
-    // 키워드 칩 행
     chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -851,84 +598,5 @@ const styles = StyleSheet.create({
         color: colors.textMuted,
         textAlign: 'center',
         paddingHorizontal: spacing.lg,
-    },
-
-    noticeCard: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: spacing.sm,
-        backgroundColor: colors.bgRaised,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.border,
-        padding: spacing.md,
-    },
-    noticeBodyWrap: { flex: 1, gap: spacing.xs },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 1.5,
-        borderColor: colors.borderStrong,
-        backgroundColor: colors.bgRaisedAlt,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 2,
-    },
-    noticeTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        marginBottom: 2,
-    },
-    titleRow: { flexDirection: 'row', alignItems: 'flex-start' },
-    userPinIcon: { marginRight: 5, marginTop: 5 },
-    tag: {
-        borderRadius: radius.sm,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-    },
-    tagText: { ...typography.caption, fontWeight: '600', fontSize: 11 },
-    /* 신규 공지 'N' 뱃지 — Premium Black 테마에 어울리는 은은한 pill */
-    newBadge: {
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.28)',
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-    },
-    newBadgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        letterSpacing: 0.4,
-    },
-    pinIcon: { marginLeft: 2 },
-    noticeTime: { ...typography.caption, color: colors.textMuted, marginLeft: 'auto' },
-
-    noticeTitle: {
-        ...typography.body,
-        color: colors.textPrimary,
-        lineHeight: 22,
-        flex: 1,
-    },
-    noticeBottom: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        marginTop: 4,
-    },
-    noticeDept: { ...typography.caption, color: colors.textMuted, flex: 1 },
-    matchedRow: { flexDirection: 'row', gap: 4 },
-    matchChip: {
-        borderRadius: radius.sm,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-    },
-    matchChipText: { fontSize: 11, fontWeight: '600' },
-    externalIconBtn: {
-        padding: 3,
-        marginLeft: spacing.xs,
     },
 });
