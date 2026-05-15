@@ -29,7 +29,7 @@ import {
 import { SectionTrashButton } from '../features/notices/components/SectionTrashButton';
 import { SelectionActionBar } from '../features/notices/components/SelectionActionBar';
 import { NoticeBulkDeleteModal } from '../features/notices/components/NoticeBulkDeleteModal';
-import { SwipeableNoticeRow } from '../features/notices/components/SwipeableNoticeRow';
+import { SwipeableNoticeRow, type SwipeableNoticeRowHandle } from '../features/notices/components/SwipeableNoticeRow';
 import {
     NoticeContextMenu,
     type NoticeMenuItem,
@@ -72,7 +72,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     const [confirmOpen, setConfirmOpen] = useState(false);
 
     const isNewNotice = useNewNoticeDetection(section);
-    const swipe = useSwipeRowManager();
+    const swipe = useSwipeRowManager<SwipeableNoticeRowHandle>();
     const {
         selectionMode,
         selected,

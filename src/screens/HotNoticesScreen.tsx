@@ -14,17 +14,12 @@ import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { uosAdapter } from '../services/universities/uos';
 import { timeAgo } from '../utils/time';
+import { formatViewCount } from '../utils/format';
 import { CATEGORY_LABEL } from '../constants/categories';
 import type { Notice } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'HotNotices'>;
-
-function formatViewCount(n: number): string {
-    if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-    return String(n);
-}
 
 export default function HotNoticesScreen({ navigation }: Props) {
     const [notices, setNotices] = useState<Notice[]>([]);
