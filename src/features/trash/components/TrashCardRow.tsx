@@ -101,18 +101,14 @@ export function TrashCardRow({ row, onRestore, onPurge }: Props) {
                 </View>
 
                 <View style={styles.actions}>
-                    <PressableScale
-                        onPress={onRestore}
-                        hapticKind="light"
-                        style={styles.restoreBtn}
-                    >
+                    {/*
+                     * 햅틱은 액션 콜백(handleRestore→success, handlePurge→confirm 후 warning)
+                     * 에서 발화. 버튼 탭 자체에는 별도 진동 없음.
+                     */}
+                    <PressableScale onPress={onRestore} style={styles.restoreBtn}>
                         <Ionicons name="arrow-undo" size={16} color={colors.success} />
                     </PressableScale>
-                    <PressableScale
-                        onPress={onPurge}
-                        hapticKind="warning"
-                        style={styles.purgeBtn}
-                    >
+                    <PressableScale onPress={onPurge} style={styles.purgeBtn}>
                         <Ionicons name="trash" size={16} color={colors.danger} />
                     </PressableScale>
                 </View>

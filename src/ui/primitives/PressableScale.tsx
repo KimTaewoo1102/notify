@@ -32,11 +32,15 @@ export interface PressableScaleProps
  * 어디서나 쓸 수 있는 "쫀득한" 클릭 컴포넌트.
  * - onPressIn: 빠르게 0.965 까지 압축
  * - onPressOut: 부드럽게 1.0 으로 복귀 (반동 살짝)
- * - onPress: 햅틱 발사 + 외부 핸들러 호출
+ * - onPress: hapticKind 가 명시된 경우에만 햅틱 발사 + 외부 핸들러 호출
+ *
+ * 햅틱 정책 (Premium Black = 자제):
+ *   기본은 햅틱 없음. 상태 변화(토글/선택), 성공/실패, 위험 액션 등
+ *   "의미 있는 피드백"이 필요한 경우에만 명시적으로 hapticKind 를 지정한다.
  */
 export function PressableScale({
     scaleTo = 0.965,
-    hapticKind = 'light',
+    hapticKind = null,
     onPress,
     onPressIn,
     onPressOut,

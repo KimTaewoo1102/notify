@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
     Alert,
     FlatList,
     Pressable,
     StyleSheet,
-    Text,
     View,
 } from 'react-native';
 import DraggableFlatList, {
@@ -19,6 +18,7 @@ import { EditDoneButton } from '../features/home/EditDoneButton';
 import { HotNoticeCard } from '../features/home/HotNoticeCard';
 import { EmptyState } from '../features/home/EmptyState';
 import { useHomePrefetch } from '../features/home/hooks/useHomePrefetch';
+import { AppMenuSheet, type AppMenuSheetHandle } from '../features/home/sheets/AppMenuSheet';
 import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
 import { HomeSectionRow } from '../features/sections/components/HomeSectionRow';
@@ -63,6 +63,8 @@ export default function HomeScreen({ navigation }: Props) {
     const noticeCache = useNoticeCacheStore(s => s.cache);
 
     const [renameTarget, setRenameTarget] = useState<Section | null>(null);
+
+    const appMenuRef = useRef<AppMenuSheetHandle>(null);
 
     const hotNotice = useHomePrefetch(userSections);
     const swipe = useSwipeRowManager<SwipeableSectionRowHandle>();
@@ -118,15 +120,7 @@ export default function HomeScreen({ navigation }: Props) {
         navigation.setOptions({
             headerLeft: () => (
                 <Pressable
-                    onPress={() =>
-                        Alert.alert('메뉴', '', [
-                            {
-                                text: '휴지통',
-                                onPress: () => navigation.navigate('Trash'),
-                            },
-                            { text: '취소', style: 'cancel' },
-                        ])
-                    }
+                    onPress={() => appMenuRef.current?.present()}
                     hitSlop={12}
                     style={({ pressed }) => [
                         headerBtnStyles.btn,
@@ -284,6 +278,11 @@ export default function HomeScreen({ navigation }: Props) {
                 initial={renameTarget?.title ?? ''}
                 onClose={() => setRenameTarget(null)}
                 onSubmit={handleRename}
+            />
+
+            <AppMenuSheet
+                ref={appMenuRef}
+                onTrash={() => navigation.navigate('Trash')}
             />
         </View>
     );

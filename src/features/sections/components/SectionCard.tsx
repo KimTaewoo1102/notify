@@ -135,7 +135,6 @@ export function SectionCard({
                               }
                     }
                     disabled={editMode && !isSystem}
-                    hapticKind={editMode || isSystem ? null : 'light'}
                     scaleTo={isSystem ? 0.99 : 0.98}
                 >
                     <View style={styles.cardContent}>
