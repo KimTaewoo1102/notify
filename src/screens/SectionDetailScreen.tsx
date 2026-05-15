@@ -124,7 +124,8 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     }, [sectionId, isSystemPin, markVisited]);
 
     const onRefresh = useCallback(async () => {
-        haptic('light');
+        // pull-to-refresh trigger 햅틱은 RefreshControl 자체가 native 로 처리.
+        // 완료 시점만 명시적 success 로 알림.
         setIsRefreshing(true);
         await fetchNotices();
         setIsRefreshing(false);
@@ -173,19 +174,12 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
             if (selectionMode) {
                 haptic('selection');
                 toggleSelected(n.id);
+                return;
             }
-        },
-        [selectionMode, toggleSelected, swipe],
-    );
-
-    /** 외부 링크 아이콘 전용 핸들러 — 카드 전체 탭이 아닌 아이콘에서만 호출 */
-    const onOpenNoticeUrl = useCallback(
-        (n: Notice) => {
-            swipe.closeOpenRow();
-            haptic('light');
+            // 카드 본문 탭 → 외부 URL 열기 (chevron-forward 가 affordance)
             Linking.openURL(n.sourceUrl).catch(() => {});
         },
-        [swipe],
+        [selectionMode, toggleSelected, swipe],
     );
 
     const onLongPressNotice = useCallback(
@@ -243,13 +237,10 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 icon: isPinned ? 'pin' : 'pin-outline',
                 iconColor: isPinned ? colors.warning : colors.textSecondary,
                 onPress: () => {
-                    if (isPinned) {
-                        unpinNotice(notice.id);
-                        haptic('light');
-                    } else {
-                        togglePinNotice(notice, sectionId);
-                        haptic('success');
-                    }
+                    if (isPinned) unpinNotice(notice.id);
+                    else togglePinNotice(notice, sectionId);
+                    // 토글 상태 변화 → selection 햅틱 (양방향 동일)
+                    haptic('selection');
                 },
             },
             {
@@ -316,7 +307,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 isNew={isNew}
                 onPress={() => onPressNotice(notice)}
                 onLongPress={anchor => onLongPressNotice(notice, anchor)}
-                onOpenUrl={() => onOpenNoticeUrl(notice)}
             />
         </SwipeableNoticeRow>
     );
@@ -337,8 +327,12 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                     ) : undefined
                 }
             >
-                {/* 빈 공간 탭 → 열린 스와이프 row 닫기. 자식 Pressable이 먼저 소비하므로 카드 탭에는 미발동 */}
-                <Pressable onPress={swipe.closeOpenRow} style={styles.tapToDismiss}>
+                {/*
+                 * 빈 공간 탭 → 열린 스와이프 row 닫기.
+                 * onPressIn 으로 즉시 발화 (touch down) — onPress 의 ~150ms lag 제거.
+                 * 자식 Pressable(NoticeRow) 이 먼저 responder 를 잡으므로 카드 탭에는 미발동.
+                 */}
+                <Pressable onPressIn={swipe.closeOpenRow} style={styles.tapToDismiss}>
                 {/* 시스템 섹션(고정)은 상단 요약 카드만 표시 */}
                 {isSystemPin && (
                     <Card accent={accent} shadow="md" style={styles.summary}>
@@ -368,7 +362,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                         {/* 키워드 편집 카드 — 현재 키워드 칩 표시 */}
                         <PressableScale
                             onPress={() => openKeywordEdit(section.id)}
-                            hapticKind="light"
                             style={[styles.editBtn, { borderColor: accent + '55' }]}
                         >
                             <View style={styles.editBtnTop}>
@@ -411,7 +404,6 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                         {!isSystemPin && (
                             <PressableScale
                                 onPress={fetchNotices}
-                                hapticKind="light"
                                 style={styles.refreshBtn}
                                 disabled={loading}
                             >

@@ -1,12 +1,11 @@
 import React, { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PressableScale } from '../../../ui/primitives/PressableScale';
 import { colors, radius, spacing, typography } from '../../../ui/theme';
 import { CATEGORY_LABEL } from '../../../constants/categories';
 import {
-    EXTERNAL_LINK_HIT_SLOP,
     LONG_PRESS_DELAY_MS,
     MAX_MATCHED_KEYWORDS_DISPLAYED,
 } from '../../../constants/ui';
@@ -27,17 +26,19 @@ interface Props {
     isSelected: boolean;
     /** 화면 진입 시 스냅샷된 lastVisitedAt 기준으로 판정된 '신규' 공지 여부. */
     isNew: boolean;
+    /** 카드 본문 탭 — selection / 스와이프 닫기 / URL 열기 등 (호출 측 결정) */
     onPress: () => void;
     onLongPress: (anchor: NoticeMenuAnchor) => void;
-    /** 외부 링크 아이콘 전용 핸들러 — 카드 전체가 아닌 아이콘에서만 URL 을 엽니다. */
-    onOpenUrl: () => void;
 }
 
 /**
  * 단일 공지 카드.
+ *  - 카드 본문 탭 = 외부 URL 열기 (호출 측에서 onPress 안에 처리).
+ *    우측 chevron-forward 가 affordance 를 시각적으로 표현.
  *  - 카드 위치 측정 → 컨텍스트 메뉴 anchor 계산.
- *  - selectionMode 일 때 좌측 체크박스 노출, 우하단 외부 링크 아이콘 숨김.
+ *  - selectionMode 일 때 좌측 체크박스 노출, 우측 chevron 숨김.
  *  - 신규/핀/선택 상태에 따라 카드 배경/테두리 톤 변경.
+ *  - '신규' 표시는 미니멀한 컬러 dot (accentAlt) — 텍스트 뱃지 대신.
  */
 export function NoticeRow({
     notice,
@@ -48,7 +49,6 @@ export function NoticeRow({
     isNew,
     onPress,
     onLongPress,
-    onOpenUrl,
 }: Props) {
     const ref = useRef<View>(null);
 
@@ -64,7 +64,6 @@ export function NoticeRow({
                 onPress={onPress}
                 onLongPress={handleLongPress}
                 delayLongPress={LONG_PRESS_DELAY_MS}
-                hapticKind={null}
                 scaleTo={0.985}
                 style={[
                     styles.card,
@@ -102,11 +101,9 @@ export function NoticeRow({
                                 {CATEGORY_LABEL[notice.category] ?? notice.category}
                             </Text>
                         </View>
-                        {/* 신규 공지 — 미니멀 'N' 뱃지 (테두리 대신 은은한 pill) */}
+                        {/* 신규 공지 — 미니멀 컬러 dot (accentAlt) */}
                         {isNew && !selectionMode && !pinned && (
-                            <View style={styles.newBadge}>
-                                <Text style={styles.newBadgeText}>N</Text>
-                            </View>
+                            <View style={styles.newDot} />
                         )}
                         {notice.isSourcePinned && (
                             <Ionicons
@@ -159,24 +156,18 @@ export function NoticeRow({
                                     ))}
                             </View>
                         )}
-                        {!selectionMode && (
-                            <Pressable
-                                onPress={onOpenUrl}
-                                hitSlop={EXTERNAL_LINK_HIT_SLOP}
-                                style={({ pressed }) => [
-                                    styles.externalIconBtn,
-                                    pressed && { opacity: 0.5 },
-                                ]}
-                            >
-                                <Ionicons
-                                    name="open-outline"
-                                    size={13}
-                                    color={colors.textMuted}
-                                />
-                            </Pressable>
-                        )}
                     </View>
                 </View>
+
+                {/* 우측 chevron — '탭하여 열기' 의 affordance. selection mode 에서는 숨김. */}
+                {!selectionMode && (
+                    <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={colors.textDisabled}
+                        style={styles.chevron}
+                    />
+                )}
             </PressableScale>
         </View>
     );
@@ -223,20 +214,12 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     tagText: { ...typography.caption, fontWeight: '600', fontSize: 11 },
-    /* 신규 공지 'N' 뱃지 — Premium Black 테마에 어울리는 은은한 pill */
-    newBadge: {
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.28)',
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-    },
-    newBadgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        letterSpacing: 0.4,
+    /* 신규 공지 dot — 6px circle, accentAlt (시안) */
+    newDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.accentAlt,
     },
     pinIcon: { marginLeft: 2 },
     time: {
@@ -264,8 +247,7 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     matchChipText: { fontSize: 11, fontWeight: '600' },
-    externalIconBtn: {
-        padding: 3,
-        marginLeft: spacing.xs,
+    chevron: {
+        alignSelf: 'center',
     },
 });

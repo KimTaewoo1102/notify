@@ -25,8 +25,10 @@ export function HotNoticeCard({ notice, onPress }: Props) {
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}
         >
             <View style={styles.topRow}>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>HOT</Text>
+                {/* Premium 톤 — 빨강 dot + 'Hot' 텍스트 (이전 강렬한 HOT 뱃지 대체) */}
+                <View style={styles.hotIndicator}>
+                    <View style={styles.hotDot} />
+                    <Text style={styles.hotLabel}>Hot</Text>
                 </View>
                 <Text style={styles.seeAll}>전체 보기</Text>
                 <Ionicons name="chevron-forward" size={13} color={colors.textDisabled} />
@@ -69,17 +71,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: spacing.xs,
     },
-    badge: {
-        backgroundColor: colors.danger,
-        borderRadius: radius.sm,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
+    hotIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#fff',
-        letterSpacing: 0.8,
+    hotDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.danger,
+    },
+    hotLabel: {
+        ...typography.caption,
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.textPrimary,
     },
     seeAll: {
         ...typography.caption,
