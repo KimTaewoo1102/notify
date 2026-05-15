@@ -15,6 +15,7 @@ import Animated, {
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
+import { runAfterFrame } from '../../../utils/nextFrame';
 
 export interface NoticeMenuItem {
     key: string;
@@ -96,7 +97,7 @@ export function NoticeContextMenu({ visible, anchor, items, onClose }: Props) {
                                     key={it.key}
                                     onPress={() => {
                                         onClose();
-                                        requestAnimationFrame(it.onPress);
+                                        runAfterFrame(it.onPress);
                                     }}
                                     style={({ pressed }) => [
                                         styles.item,

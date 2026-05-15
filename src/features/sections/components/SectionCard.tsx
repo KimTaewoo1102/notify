@@ -1,35 +1,20 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-    Dimensions,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
-import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withSequence,
-    withSpring,
-    withTiming,
-} from 'react-native-reanimated';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PressableScale } from '../../../ui/primitives/PressableScale';
 import { haptic } from '../../../ui/feedback/haptics';
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
+import { useSectionCardAnimation } from '../hooks/useSectionCardAnimation';
+import { useSectionKebabMenu } from '../hooks/useSectionKebabMenu';
+import type { Section } from '../../../types/domain';
+
+import { SectionCardMenu } from './SectionCardMenu';
 
 /** 모든 user 섹션에 동일하게 적용되는 통일 accent. 시스템 섹션은 자체 accentColor 유지. */
 const USER_ACCENT = colors.accent;
-import type { Section } from '../../../types/domain';
-import {
-    SectionCardMenu,
-    type MenuAnchor,
-    type SectionMenuItem,
-} from './SectionCardMenu';
-
-const SCREEN_W = Dimensions.get('window').width;
 
 interface Props {
     section: Section;
@@ -69,89 +54,16 @@ export function SectionCard({
     const isSystem = section.kind === 'system';
     const effectiveAccent = isSystem ? section.accentColor : USER_ACCENT;
 
-    const dragScale = useSharedValue(1);
-    const dragOpacity = useSharedValue(1);
-    const shake = useSharedValue(0);
+    const wrapperStyle = useSectionCardAnimation({
+        isDragActive,
+        notifyOn: section.notifyOn,
+        isSystem,
+    });
 
-    useEffect(() => {
-        dragScale.value = withSpring(isDragActive ? 1.04 : 1, {
-            damping: 14,
-            stiffness: 200,
-        });
-        dragOpacity.value = withSpring(isDragActive ? 0.96 : 1, {
-            damping: 18,
-            stiffness: 240,
-        });
-    }, [isDragActive, dragScale, dragOpacity]);
-
-    const prevNotify = useRef(section.notifyOn);
-    useEffect(() => {
-        const wasOff = !prevNotify.current;
-        const isOn = section.notifyOn;
-        if (wasOff && isOn && !isSystem) {
-            haptic('heavy');
-            shake.value = withSequence(
-                withTiming(-7, { duration: 50 }),
-                withTiming(7, { duration: 60 }),
-                withTiming(-6, { duration: 60 }),
-                withTiming(5, { duration: 55 }),
-                withTiming(-3, { duration: 55 }),
-                withTiming(0, { duration: 70 }),
-            );
-        }
-        prevNotify.current = section.notifyOn;
-    }, [section.notifyOn, isSystem, shake]);
-
-    const wrapperStyle = useAnimatedStyle(() => ({
-        transform: [
-            { translateX: shake.value },
-            { scale: dragScale.value },
-        ],
-        opacity: dragOpacity.value,
-    }));
-
-    /* ─── 케밥 메뉴 ──────────────────────────────────────── */
-    const kebabRef = useRef<View>(null);
-    const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
-
-    const openMenu = () => {
-        haptic('selection');
-        kebabRef.current?.measureInWindow((x, y, w, h) => {
-            setMenuAnchor({
-                top: y + h + 6,
-                right: Math.max(spacing.lg, SCREEN_W - (x + w)),
-            });
-        });
-    };
-    const closeMenu = () => setMenuAnchor(null);
-
-    const menuItems: SectionMenuItem[] = [
-        {
-            key: 'notify',
-            label: section.notifyOn ? '알람 끄기' : '알람 켜기',
-            icon: section.notifyOn ? 'notifications-off' : 'notifications',
-            onPress: () => onToggleNotify?.(),
-        },
-        {
-            key: 'kw',
-            label: '키워드 편집',
-            icon: 'pricetag',
-            onPress: () => onEditKeywords?.(),
-        },
-        {
-            key: 'rename',
-            label: '이름 변경',
-            icon: 'create-outline',
-            onPress: () => onRename?.(),
-        },
-        {
-            key: 'delete',
-            label: '섹션 삭제',
-            icon: 'trash',
-            destructive: true,
-            onPress: () => onDelete?.(),
-        },
-    ];
+    const { kebabRef, anchor, items, openMenu, closeMenu } = useSectionKebabMenu(
+        section,
+        { onToggleNotify, onEditKeywords, onRename, onDelete },
+    );
 
     const showKebab = !isSystem && !editMode;
     const showDelete = !isSystem && editMode;
@@ -233,8 +145,7 @@ export function SectionCard({
                                     styles.leading,
                                     {
                                         backgroundColor:
-                                            effectiveAccent +
-                                            (isSystem ? '2A' : '22'),
+                                            effectiveAccent + (isSystem ? '2A' : '22'),
                                     },
                                 ]}
                             >
@@ -305,11 +216,7 @@ export function SectionCard({
                                         pressed && { opacity: 0.6 },
                                     ]}
                                 >
-                                    <Ionicons
-                                        name="remove"
-                                        size={18}
-                                        color="#fff"
-                                    />
+                                    <Ionicons name="remove" size={18} color="#fff" />
                                 </Pressable>
                             ) : (
                                 <View style={styles.trailing}>
@@ -364,9 +271,9 @@ export function SectionCard({
             </View>
 
             <SectionCardMenu
-                visible={!!menuAnchor}
-                anchor={menuAnchor}
-                items={menuItems}
+                visible={!!anchor}
+                anchor={anchor}
+                items={items}
                 onClose={closeMenu}
             />
         </Animated.View>
@@ -382,16 +289,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
         overflow: 'hidden',
-    },
-    /* 시스템 카드 좌측 2px accent 스트라이프 */
-    sideStripe: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        bottom: 0,
-        width: 2.5,
-        opacity: 0.7,
-        zIndex: 1,
     },
     /* 상단 1.5px 그라데이션 accent 라인 */
     accentLine: {
@@ -434,7 +331,6 @@ const styles = StyleSheet.create({
     titleRow: { flexDirection: 'row', alignItems: 'center' },
     pinIcon: { marginRight: 4 },
     mutedIcon: { marginLeft: 4, flexShrink: 0 },
-    systemLeadingIcon: { marginTop: -1 },
     title: { ...typography.body, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
     systemTitle: { letterSpacing: 0.2 },
     meta: {
