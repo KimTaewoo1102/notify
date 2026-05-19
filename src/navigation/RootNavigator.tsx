@@ -20,7 +20,7 @@ export default function RootNavigator() {
                 headerTintColor: colors.textPrimary,
                 headerTitleStyle: { fontWeight: '600' },
                 headerShadowVisible: false,
-                contentStyle: { backgroundColor: colors.bgBase },
+                contentStyle: { backgroundColor: 'transparent' },
                 animation: 'slide_from_right',
             }}
         >

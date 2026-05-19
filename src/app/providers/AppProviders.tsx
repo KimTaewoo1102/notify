@@ -11,7 +11,7 @@ const navTheme: Theme = {
     ...DarkTheme,
     colors: {
         ...DarkTheme.colors,
-        background: colors.bgBase,
+        background: 'transparent',
         card: colors.bgTop,
         primary: colors.accent,
         text: colors.textPrimary,
@@ -33,5 +33,5 @@ export default function AppProviders({ children }: PropsWithChildren) {
 }
 
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgTop },
+    root: { flex: 1, backgroundColor: 'transparent' },
 });
