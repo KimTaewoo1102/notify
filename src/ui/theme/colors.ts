@@ -6,6 +6,13 @@ export const colors = {
 
     border: 'rgba(255,255,255,0.06)',
     borderStrong: 'rgba(255,255,255,0.12)',
+    /**
+     * 카드 / 메뉴 / 다이얼로그 상단 가장자리 highlight.
+     * 다크 모드에서는 검정 shadow 만으로는 depth 가 약하므로 "위에서 빛이 든" 느낌의
+     * 1px 톱-에지 highlight 를 더해 이중 depth 를 만든다.
+     */
+    edgeHighlight: 'rgba(255,255,255,0.10)',
+    edgeHighlightStrong: 'rgba(255,255,255,0.18)',
 
     textPrimary: '#F5F5F7',
     textSecondary: 'rgba(245,245,247,0.66)',

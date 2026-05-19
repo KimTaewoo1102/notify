@@ -13,9 +13,14 @@ import { haptic } from '../../ui/feedback/haptics';
 
 // 두 상태의 명확한 시각 차이를 위해 양 끝 박스 사이즈는 고정값으로 둔다.
 // (Reanimated 의 width/height 보간은 'auto' 를 지원하지 않음.)
-const EDIT_W = 44;
+//
+// 한글 '완료' + bodySm(14) + Bold(700) + letterSpacing 0.2 기준:
+//   * 100% 동적 타입: ~36px 텍스트 폭
+//   * 130% 동적 타입: ~47px 텍스트 폭
+// DONE_W=80 으로 두면 130% 까지 안전한 여백 확보. 100% 에선 살짝 넉넉.
+const EDIT_W = 50;
 const EDIT_H = 30;
-const DONE_W = 72;
+const DONE_W = 80;
 const DONE_H = 26;
 
 const SPRING = { damping: 20, stiffness: 260, mass: 0.7 } as const;

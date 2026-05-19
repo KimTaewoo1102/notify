@@ -494,8 +494,10 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
-    content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
-    tapToDismiss: { flex: 1, gap: spacing.md },
+    // gap: HomeScreen / TrashScreen list 와 정합 (spacing.sm). 이전 spacing.md(12px) 는
+    // 다른 화면(8px) 대비 살짝 헐거웠음 — 8px 로 통일해 Premium 톤 강화.
+    content: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 120 },
+    tapToDismiss: { flex: 1, gap: spacing.sm },
     muted: {
         ...typography.body,
         color: colors.textMuted,
