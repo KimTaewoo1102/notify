@@ -7,6 +7,7 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -35,7 +36,6 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
     function SwipeableSectionRow({ onDelete, onToggleNotify, notifyOn, onOpen, children }, ref) {
         const translateX = useSharedValue(0);
 
-        // JS 콜백을 ref로 봉인 → gesture closure stale 방지
         const onDeleteRef = useRef(onDelete);
         const onToggleNotifyRef = useRef(onToggleNotify);
         const onOpenRef = useRef(onOpen);
@@ -66,9 +66,6 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
         const pan = useMemo(
             () =>
                 Gesture.Pan()
-                    // 표준 임계값 — SwipeableNoticeRow 의 PanResponder 와 정합:
-                    //   * activeOffsetX(-12) — 좌향 12px 초과 시 활성화 (우향은 무시)
-                    //   * failOffsetY([-10,10]) — 수직 변위 10px 초과 시 즉시 fail → 부모 스크롤
                     .activeOffsetX([-12, 999])
                     .failOffsetY([-10, 10])
                     .onUpdate((e) => {
@@ -93,22 +90,36 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
             transform: [{ translateX: translateX.value }],
         }));
 
+        // 버튼 컨테이너 너비를 translateX와 동기화.
+        // 카드가 LEFT로 이동한 거리만큼만 버튼이 노출된다.
+        // 카드가 원위치일 때 width=0 → 버튼 완전 숨김, 유리 카드 뒤로 비치지 않음.
+        const actionsRevealStyle = useAnimatedStyle(() => ({
+            width: Math.max(0, Math.min(-translateX.value, ACTION_WIDTH)),
+        }));
+
         return (
             <View style={styles.wrap}>
-                {/* actionsClip 은 카드의 시각적 경계와 정확히 일치 — overflow:hidden 으로
-                    버튼 색상이 카드 모서리 밖으로 삐져나오지 않도록 클리핑 */}
-                <View style={styles.actionsClip}>
+                {/* GestureDetector 먼저 → 카드가 낮은 z-index */}
+                <GestureDetector gesture={pan}>
+                    <Animated.View style={cardStyle}>{children}</Animated.View>
+                </GestureDetector>
+
+                {/* actionsReveal: 카드보다 높은 z-index, width 애니메이션으로 노출 제어.
+                    BlurView는 카드 레이어 위에 있으므로 카드 유리면에 비치지 않는다. */}
+                <Animated.View style={[styles.actionsReveal, actionsRevealStyle]}>
+                    <BlurView intensity={72} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.actionsBg}>
                         <Pressable
                             onPress={callToggleNotify}
                             style={[styles.actionBtn, styles.notifyBtn]}
                         >
+                            <View style={[StyleSheet.absoluteFill, styles.notifyOverlay]} />
                             <Ionicons
                                 name={notifyOn ? 'notifications-off' : 'notifications'}
                                 size={20}
-                                color="rgba(255,255,255,0.85)"
+                                color={colors.accentAlt}
                             />
-                            <Text style={styles.actionLabel}>
+                            <Text style={[styles.actionLabel, { color: colors.accentAlt }]}>
                                 {notifyOn ? '알림끄기' : '알림켜기'}
                             </Text>
                         </Pressable>
@@ -117,15 +128,12 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
                             onPress={callDelete}
                             style={[styles.actionBtn, styles.deleteBtn]}
                         >
-                            <Ionicons name="trash" size={20} color="rgba(255,255,255,0.85)" />
-                            <Text style={styles.actionLabel}>삭제</Text>
+                            <View style={[StyleSheet.absoluteFill, styles.deleteOverlay]} />
+                            <Ionicons name="trash" size={20} color={colors.danger} />
+                            <Text style={[styles.actionLabel, { color: colors.danger }]}>삭제</Text>
                         </Pressable>
                     </View>
-                </View>
-
-                <GestureDetector gesture={pan}>
-                    <Animated.View style={cardStyle}>{children}</Animated.View>
-                </GestureDetector>
+                </Animated.View>
             </View>
         );
     },
@@ -133,16 +141,18 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
 
 const styles = StyleSheet.create({
     wrap: { position: 'relative' },
-    /* 카드의 시각 경계(outerWrapper marginVertical:6 + borderRadius:lg)와 정확히 일치.
-       overflow:hidden 으로 버튼 배경이 카드 둥근 모서리 밖으로 삐져나오지 않도록 한다. */
-    actionsClip: {
+
+    /* 카드 슬라이드 거리만큼 너비가 늘어나는 버튼 컨테이너.
+       overflow:hidden + borderTopRightRadius/borderBottomRightRadius 로
+       카드 우측 모서리와 정확히 일치. */
+    actionsReveal: {
         position: 'absolute',
         top: 6,
         bottom: 6,
-        left: 0,
         right: 0,
-        borderRadius: radius.lg,
         overflow: 'hidden',
+        borderTopRightRadius: radius.lg,
+        borderBottomRightRadius: radius.lg,
     },
     actionsBg: {
         position: 'absolute',
@@ -157,16 +167,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 4,
+        overflow: 'hidden',
     },
-    notifyBtn: {
-        backgroundColor: 'rgba(42, 96, 160, 0.88)',
+    notifyOverlay: {
+        backgroundColor: `${colors.accentAlt}22`,
     },
+    deleteOverlay: {
+        backgroundColor: `${colors.danger}22`,
+    },
+    notifyBtn: {},
     deleteBtn: {
-        backgroundColor: 'rgba(148, 36, 58, 0.88)',
+        borderLeftWidth: StyleSheet.hairlineWidth,
+        borderLeftColor: 'rgba(255,255,255,0.08)',
     },
     actionLabel: {
         ...typography.caption,
-        color: 'rgba(255,255,255,0.85)',
         fontWeight: '600',
         fontSize: 10,
     },
