@@ -4,12 +4,13 @@ import {
     Pressable,
     StyleSheet,
     Text,
-    View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
 import { runAfterFrame } from '../../../utils/nextFrame';
+import { useMenuEntrance } from '../../../ui/animations/entrance';
 
 export interface SectionMenuItem {
     key: string;
@@ -34,62 +35,68 @@ interface Props {
 
 /**
  * 케밥 버튼 위치 아래에 떠오르는 작은 popover.
- * - Modal 의 transparent 배경 한 장으로 외부 탭 = 닫기 처리.
- * - 항목 탭 시 메뉴를 먼저 닫고 다음 frame 에 onPress 실행 → Modal/Sheet 가
- *   동시에 떠서 z-index 충돌이 나는 것을 방지.
+ *  - Modal 의 transparent 배경 한 장으로 외부 탭 = 닫기 처리.
+ *  - 엔트런스: `useMenuEntrance` 공용 hook 사용 (spring scale 0.88→1 +
+ *    timing opacity + translateY -6→0). 이전 Modal 의 단순 fade 대비 깊이감.
+ *  - 항목 탭 시 메뉴를 먼저 닫고 다음 frame 에 onPress 실행 (`runAfterFrame`) →
+ *    Modal/Sheet 가 동시에 떠서 z-index 충돌 나는 것을 방지.
  */
 export function SectionCardMenu({ visible, anchor, items, onClose }: Props) {
+    const { menuStyle, backdropStyle } = useMenuEntrance(visible);
+
     return (
         <Modal
             visible={visible && !!anchor}
             transparent
-            animationType="fade"
+            animationType="none"
             onRequestClose={onClose}
             statusBarTranslucent
         >
-            <Pressable style={styles.backdrop} onPress={onClose}>
+            <Pressable style={styles.fill} onPress={onClose}>
+                <Animated.View style={[styles.backdrop, backdropStyle]} />
                 {anchor ? (
-                    <Pressable
+                    <Animated.View
                         style={[
                             styles.menu,
                             { top: anchor.top, right: anchor.right },
+                            menuStyle,
                         ]}
-                        // 메뉴 영역 클릭이 backdrop 으로 새지 않도록 noop.
-                        onPress={() => {}}
                     >
-                        {items.map((it, i) => (
-                            <Pressable
-                                key={it.key}
-                                onPress={() => {
-                                    onClose();
-                                    runAfterFrame(it.onPress);
-                                }}
-                                style={({ pressed }) => [
-                                    styles.item,
-                                    i > 0 && styles.itemDivider,
-                                    pressed && styles.itemPressed,
-                                ]}
-                            >
-                                <Ionicons
-                                    name={it.icon}
-                                    size={16}
-                                    color={
-                                        it.destructive
-                                            ? colors.danger
-                                            : colors.textSecondary
-                                    }
-                                />
-                                <Text
-                                    style={[
-                                        styles.label,
-                                        it.destructive && styles.destructive,
+                        <Pressable onPress={() => {}}>
+                            {items.map((it, i) => (
+                                <Pressable
+                                    key={it.key}
+                                    onPress={() => {
+                                        onClose();
+                                        runAfterFrame(it.onPress);
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.item,
+                                        i > 0 && styles.itemDivider,
+                                        pressed && styles.itemPressed,
                                     ]}
                                 >
-                                    {it.label}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </Pressable>
+                                    <Ionicons
+                                        name={it.icon}
+                                        size={16}
+                                        color={
+                                            it.destructive
+                                                ? colors.danger
+                                                : colors.textSecondary
+                                        }
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.label,
+                                            it.destructive && styles.destructive,
+                                        ]}
+                                    >
+                                        {it.label}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </Pressable>
+                    </Animated.View>
                 ) : null}
             </Pressable>
         </Modal>
@@ -97,8 +104,9 @@ export function SectionCardMenu({ visible, anchor, items, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
+    fill: { flex: 1 },
     backdrop: {
-        flex: 1,
+        ...StyleSheet.absoluteFillObject,
         // 살짝 어둡게 — 시선이 메뉴로 모이도록.
         backgroundColor: 'rgba(0,0,0,0.18)',
     },
@@ -109,6 +117,8 @@ const styles = StyleSheet.create({
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: colors.borderStrong,
+        // 상단 가장자리 highlight — 이중 depth (shadow + edge)
+        borderTopColor: colors.edgeHighlightStrong,
         paddingVertical: 4,
         ...shadows.lg,
     },

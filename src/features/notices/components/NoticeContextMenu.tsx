@@ -1,21 +1,16 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
     Modal,
     Pressable,
     StyleSheet,
     Text,
-    View,
 } from 'react-native';
-import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
 import { runAfterFrame } from '../../../utils/nextFrame';
+import { useMenuEntrance } from '../../../ui/animations/entrance';
 
 export interface NoticeMenuItem {
     key: string;
@@ -46,31 +41,12 @@ const MENU_PAD = 12;
 
 /**
  * iOS 스타일의 long-press 컨텍스트 메뉴.
- * - backdrop 은 어둡게 페이드, 메뉴는 카드 아래에서 살짝 떠오름.
+ * - backdrop 은 어둡게 페이드, 메뉴는 spring scale + slight translateY 로 "팝" 진입.
  * - 메뉴는 항상 카드의 좌하단 또는 우하단에 anchor → 화면 끝에선 자동 보정.
+ * - 엔트런스는 `useMenuEntrance` 로 통합 (SectionCardMenu 와 동일 톤).
  */
 export function NoticeContextMenu({ visible, anchor, items, onClose }: Props) {
-    const progress = useSharedValue(0);
-
-    useEffect(() => {
-        progress.value = withTiming(visible ? 1 : 0, {
-            duration: 180,
-            easing: Easing.out(Easing.cubic),
-        });
-    }, [visible, progress]);
-
-    const menuStyle = useAnimatedStyle(() => ({
-        opacity: progress.value,
-        transform: [
-            { scale: 0.94 + 0.06 * progress.value },
-            { translateY: (1 - progress.value) * -6 },
-        ],
-    }));
-
-    const backdropStyle = useAnimatedStyle(() => ({
-        opacity: progress.value,
-    }));
-
+    const { menuStyle, backdropStyle } = useMenuEntrance(visible);
     const pos = computeMenuPosition(anchor);
 
     return (
@@ -168,6 +144,8 @@ const styles = StyleSheet.create({
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: colors.borderStrong,
+        // 상단 가장자리 highlight — 이중 depth (shadow + edge)
+        borderTopColor: colors.edgeHighlightStrong,
         paddingVertical: 4,
         ...shadows.lg,
     },

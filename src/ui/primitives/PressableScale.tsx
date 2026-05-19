@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     Pressable,
     type PressableProps,
@@ -19,6 +19,11 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SPRING_IN = { damping: 22, stiffness: 320, mass: 0.6 } as const;
 const SPRING_OUT = { damping: 12, stiffness: 180, mass: 0.7 } as const;
 
+/** long-press buildup haptic 의 발화 시점 — 전체 delayLongPress 의 절반. */
+const BUILDUP_RATIO = 0.5;
+/** delayLongPress 가 명시되지 않은 경우의 React Native 기본값. */
+const DEFAULT_LONG_PRESS_DELAY = 500;
+
 export interface PressableScaleProps
     extends Omit<PressableProps, 'style' | 'children'> {
     scaleTo?: number;
@@ -30,9 +35,11 @@ export interface PressableScaleProps
 
 /**
  * 어디서나 쓸 수 있는 "쫀득한" 클릭 컴포넌트.
- * - onPressIn: 빠르게 0.965 까지 압축
+ * - onPressIn: 빠르게 scaleTo 까지 압축
  * - onPressOut: 부드럽게 1.0 으로 복귀 (반동 살짝)
  * - onPress: hapticKind 가 명시된 경우에만 햅틱 발사 + 외부 핸들러 호출
+ * - onLongPress 가 제공되면: delayLongPress/2 시점에 light buildup 햅틱 자동 발사
+ *   ("지금 길게 누르고 있다" 신호 — 사용자가 fire 직전에 인지)
  *
  * 햅틱 정책 (Premium Black = 자제):
  *   기본은 햅틱 없음. 상태 변화(토글/선택), 성공/실패, 위험 액션 등
@@ -44,27 +51,45 @@ export function PressableScale({
     onPress,
     onPressIn,
     onPressOut,
+    onLongPress,
+    delayLongPress,
     style,
     children,
     disabled,
     ...rest
 }: PressableScaleProps) {
     const scale = useSharedValue(1);
+    const buildupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
     }));
 
+    const clearBuildupTimer = () => {
+        if (buildupTimer.current) {
+            clearTimeout(buildupTimer.current);
+            buildupTimer.current = null;
+        }
+    };
+
     return (
         <AnimatedPressable
             {...rest}
             disabled={disabled}
+            onLongPress={onLongPress}
+            delayLongPress={delayLongPress}
             onPressIn={(e: GestureResponderEvent) => {
                 scale.value = withSpring(scaleTo, SPRING_IN);
+                if (onLongPress && !disabled) {
+                    const delay =
+                        (delayLongPress ?? DEFAULT_LONG_PRESS_DELAY) * BUILDUP_RATIO;
+                    buildupTimer.current = setTimeout(() => haptic('light'), delay);
+                }
                 onPressIn?.(e);
             }}
             onPressOut={(e: GestureResponderEvent) => {
                 scale.value = withSpring(1, SPRING_OUT);
+                clearBuildupTimer();
                 onPressOut?.(e);
             }}
             onPress={(e: GestureResponderEvent) => {

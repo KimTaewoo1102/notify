@@ -3,6 +3,7 @@ import {
     Alert,
     FlatList,
     Pressable,
+    RefreshControl,
     StyleSheet,
     View,
 } from 'react-native';
@@ -66,7 +67,7 @@ export default function HomeScreen({ navigation }: Props) {
 
     const appMenuRef = useRef<AppMenuSheetHandle>(null);
 
-    const hotNotice = useHomePrefetch(userSections);
+    const { hotNotice, refresh, isRefreshing } = useHomePrefetch(userSections);
     const swipe = useSwipeRowManager<SwipeableSectionRowHandle>();
     const displaySections = useSectionSort(userSections, editMode, noticeCache, deletedIds);
 
@@ -155,10 +156,15 @@ export default function HomeScreen({ navigation }: Props) {
 
     const onPressSection = useCallback(
         (s: Section) => {
-            if (editMode) return;
+            // 편집 모드에서 카드 본문 탭 = "편집 종료" (iOS Springboard 패턴).
+            // 카드의 '−' 삭제 버튼은 자식 Pressable 이라 이 핸들러로 새지 않음.
+            if (editMode) {
+                setEditMode(false);
+                return;
+            }
             navigation.navigate('SectionDetail', { sectionId: s.id });
         },
-        [editMode, navigation],
+        [editMode, navigation, setEditMode],
     );
 
     const onLongPressSection = useCallback(() => {
@@ -234,7 +240,18 @@ export default function HomeScreen({ navigation }: Props) {
                         return (
                             <ScaleDecorator>
                                 <JiggleWrapper active={!isActive} index={idx}>
-                                    <Pressable onLongPress={drag} delayLongPress={140}>
+                                    {/*
+                                     * 편집 모드 카드 wrapper:
+                                     *   - onLongPress(140ms) → drag 시작
+                                     *   - onPress (단순 탭) → 편집 모드 종료
+                                     *   카드 내부 '−' 삭제 버튼은 자식 Pressable 이라
+                                     *   이 onPress 로 새지 않음 (RN Pressable 중첩 규칙)
+                                     */}
+                                    <Pressable
+                                        onLongPress={drag}
+                                        delayLongPress={140}
+                                        onPress={() => setEditMode(false)}
+                                    >
                                         <SectionCard
                                             section={item}
                                             editMode
@@ -258,6 +275,14 @@ export default function HomeScreen({ navigation }: Props) {
                     ListHeaderComponent={renderPinHeader}
                     ListFooterComponent={renderAddSlot}
                     onScrollBeginDrag={swipe.closeOpenRow}
+                    refreshControl={
+                        // 편집 모드에서는 P2R 미제공 (드래그-리오더와 혼동 방지).
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={refresh}
+                            tintColor={colors.accent}
+                        />
+                    }
                     renderItem={({ item }) => (
                         <HomeSectionRow
                             section={item}

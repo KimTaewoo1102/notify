@@ -11,12 +11,21 @@
  *  - ±1° 사이를 90ms 단위로 무한 반복.
  *  - 카드별로 위상이 어긋나도록 `index * phaseStepMs` 만큼 지연.
  *  - 비활성화 시 140ms 동안 0deg 로 부드럽게 복귀.
+ *
+ * Wake-up 진입 모션 — 편집 모드 진입 시 "잠에서 깨어나는" 느낌:
+ *  - rotation: 정상 보다 큰 ±wakeAngleDeg 로 한 사이클 wobble → 정상 jiggle
+ *  - scale: 1 → wakeScalePeak → 1 로 짧게 pump (시각적 acknowledgement)
+ *  - 카드 인덱스마다 phaseStepMs 단위로 stagger.
  */
 export const JIGGLE = {
     angleDeg: 1.0,
     tickMs: 90,
     phaseStepMs: 30,
     exitMs: 140,
+    wakeAngleDeg: 1.5,
+    wakeMs: 120,
+    wakeScalePeak: 0.97,
+    wakeScalePeakMs: 100,
 } as const;
 
 /**

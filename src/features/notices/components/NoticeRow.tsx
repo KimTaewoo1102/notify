@@ -198,7 +198,9 @@ const styles = StyleSheet.create({
         backgroundColor: colors.bgRaisedAlt,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 2,
+        // 카드 첫 행(tag + time)의 baseline 과 시각적 중심을 맞춘다.
+        // (이전 marginTop:2 는 1-2px 높게 떠 보였음)
+        marginTop: 4,
     },
     top: {
         flexDirection: 'row',

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Linking,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -17,6 +16,7 @@ import { ActionPill } from '../ui/primitives/ActionPill';
 import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../ui/theme';
 import { shareNotice } from '../utils/share';
+import { openExternalUrl } from '../utils/openExternal';
 import { useSectionsStore } from '../stores/sectionsStore';
 import { useUIStore } from '../stores/uiStore';
 import {
@@ -35,6 +35,7 @@ import {
     type NoticeMenuItem,
 } from '../features/notices/components/NoticeContextMenu';
 import { NoticeRow } from '../features/notices/components/NoticeRow';
+import { SelectionHeaderTitle } from '../features/notices/components/SelectionHeaderTitle';
 import { useSwipeRowManager } from '../features/notices/hooks/useSwipeRowManager';
 import { useNewNoticeDetection } from '../features/notices/hooks/useNewNoticeDetection';
 import { useNoticeSelection } from '../features/notices/hooks/useNoticeSelection';
@@ -141,12 +142,17 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     }, [selectionMode, notices.length, exitSelection]);
 
     useLayoutEffect(() => {
+        const baseTitle = isSystemPin ? '고정' : section?.title ?? '';
         navigation.setOptions({
-            title: selectionMode
-                ? `${selected.size}개 선택`
-                : isSystemPin
-                ? '고정'
-                : section?.title ?? '',
+            // SelectionActionBar slide-up 과 같은 ease curve 로 헤더도 cross-fade.
+            // 기존 즉시 변경(useLayoutEffect 의 title) 보다 시각적 연결성 강함.
+            headerTitle: () => (
+                <SelectionHeaderTitle
+                    selectionMode={selectionMode}
+                    selectedCount={selected.size}
+                    baseTitle={baseTitle}
+                />
+            ),
             headerRight: () =>
                 selectionMode || isSystemPin ? null : (
                     <SectionTrashButton
@@ -176,8 +182,10 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 toggleSelected(n.id);
                 return;
             }
-            // 카드 본문 탭 → 외부 URL 열기 (chevron-forward 가 affordance)
-            Linking.openURL(n.sourceUrl).catch(() => {});
+            // 카드 본문 탭 → 인앱 브라우저로 외부 URL 열기 (chevron-forward 가 affordance).
+            // expo-web-browser 가 iOS SFSafariViewController / Android Custom Tabs 로
+            // 시트형 표시 — 앱 컨텍스트 유지 (Linking 처럼 Safari 로 새지 않음).
+            openExternalUrl(n.sourceUrl);
         },
         [selectionMode, toggleSelected, swipe],
     );
@@ -494,8 +502,10 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
-    content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
-    tapToDismiss: { flex: 1, gap: spacing.md },
+    // gap: HomeScreen / TrashScreen list 와 정합 (spacing.sm). 이전 spacing.md(12px) 는
+    // 다른 화면(8px) 대비 살짝 헐거웠음 — 8px 로 통일해 Premium 톤 강화.
+    content: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 120 },
+    tapToDismiss: { flex: 1, gap: spacing.sm },
     muted: {
         ...typography.body,
         color: colors.textMuted,

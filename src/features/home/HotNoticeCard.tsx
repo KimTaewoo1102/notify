@@ -60,6 +60,8 @@ const styles = StyleSheet.create({
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.borderStrong,
+        // 상단 가장자리 highlight — 이중 depth (shadow + edge)
+        borderTopColor: colors.edgeHighlightStrong,
         padding: spacing.md,
         marginBottom: spacing.md,
         gap: spacing.xs,

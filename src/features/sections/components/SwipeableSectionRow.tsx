@@ -66,8 +66,11 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
         const pan = useMemo(
             () =>
                 Gesture.Pan()
-                    .activeOffsetX([-10, 999])
-                    .failOffsetY([-8, 8])
+                    // 표준 임계값 — SwipeableNoticeRow 의 PanResponder 와 정합:
+                    //   * activeOffsetX(-12) — 좌향 12px 초과 시 활성화 (우향은 무시)
+                    //   * failOffsetY([-10,10]) — 수직 변위 10px 초과 시 즉시 fail → 부모 스크롤
+                    .activeOffsetX([-12, 999])
+                    .failOffsetY([-10, 10])
                     .onUpdate((e) => {
                         const dx = Math.min(0, e.translationX);
                         translateX.value = Math.max(-ACTION_WIDTH, dx);
