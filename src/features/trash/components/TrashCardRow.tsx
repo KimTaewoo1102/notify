@@ -41,18 +41,14 @@ export function TrashCardRow({ row, onRestore, onPurge }: Props) {
     return (
         <Card accent={accent} showAccentLine={false} shadow="md" style={styles.card}>
             <View style={styles.cardRow}>
-                <View
-                    style={[
-                        styles.leading,
-                        {
-                            backgroundColor: isSection
-                                ? (accent ?? colors.bgRaisedAlt) + '22'
-                                : colors.bgRaisedAlt,
-                        },
-                    ]}
-                >
-                    {isSection ? (
-                        row.entry.payload.emoji ? (
+                {isSection && (
+                    <View
+                        style={[
+                            styles.leading,
+                            { backgroundColor: (accent ?? colors.bgRaisedAlt) + '22' },
+                        ]}
+                    >
+                        {row.entry.payload.emoji ? (
                             <Text style={styles.emoji}>{row.entry.payload.emoji}</Text>
                         ) : (
                             <View
@@ -61,15 +57,9 @@ export function TrashCardRow({ row, onRestore, onPurge }: Props) {
                                     { backgroundColor: accent ?? colors.textSecondary },
                                 ]}
                             />
-                        )
-                    ) : (
-                        <Ionicons
-                            name="document-text-outline"
-                            size={18}
-                            color={colors.textSecondary}
-                        />
-                    )}
-                </View>
+                        )}
+                    </View>
+                )}
 
                 <View style={styles.body}>
                     <View style={styles.titleRow}>

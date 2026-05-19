@@ -41,6 +41,7 @@ interface NoticesActions {
     purge: (noticeId: ID) => void;
     purgeExpired: () => void;
     purgeAll: () => void;
+    purgeForSection: (sectionId: ID) => void;
 
     /** 핀 토글 — 켜질 땐 deleted 에서 자동 제거(둘 다 켜진 상태 방지). */
     togglePin: (notice: Notice, sectionId: ID) => boolean;
@@ -129,6 +130,15 @@ export const useNoticesStore = create<NoticesStore>()(
                 }),
 
             purgeAll: () => set({ deleted: {} }),
+
+            purgeForSection: (sectionId) =>
+                set(s => {
+                    const next: Record<ID, DeletedNoticeEntry> = {};
+                    for (const [id, e] of Object.entries(s.deleted)) {
+                        if (e.sectionId !== sectionId) next[id] = e;
+                    }
+                    return { deleted: next };
+                }),
 
             togglePin: (notice, sectionId) => {
                 const isPinned = !!get().pinned[notice.id];

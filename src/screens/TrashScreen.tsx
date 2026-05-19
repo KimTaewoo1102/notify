@@ -12,9 +12,10 @@ import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'Trash'>;
 
-export default function TrashScreen({}: Props) {
-    const { rows, totalCount } = useUnifiedTrashRows();
-    const { handleRestore, handlePurge, handlePurgeAll } = useTrashActions(totalCount);
+export default function TrashScreen({ route }: Props) {
+    const sectionId = route.params?.sectionId;
+    const { rows, totalCount } = useUnifiedTrashRows(sectionId);
+    const { handleRestore, handlePurge, handlePurgeAll } = useTrashActions(totalCount, sectionId);
 
     if (totalCount === 0) {
         return (

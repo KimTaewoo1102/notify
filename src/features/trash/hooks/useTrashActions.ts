@@ -5,6 +5,7 @@ import { haptic } from '../../../ui/feedback/haptics';
 import { useTrashStore } from '../../../stores/trashStore';
 import { useSectionsStore } from '../../../stores/sectionsStore';
 import { useNoticesStore } from '../../../stores/noticesStore';
+import type { ID } from '../../../types/domain';
 
 import type { UnifiedTrashRow } from './useUnifiedTrashRows';
 
@@ -23,7 +24,7 @@ interface TrashActions {
  *  - confirm UI 는 Alert.alert 유지 (native look 보존 — ConfirmDialog 로 바꾸면
  *    iOS/Android 시스템 다이얼로그가 커스텀 Modal 로 바뀌어 UX 톤이 달라짐).
  */
-export function useTrashActions(totalCount: number): TrashActions {
+export function useTrashActions(totalCount: number, sectionId?: ID): TrashActions {
     const restoreSectionEntry = useTrashStore(s => s.restore);
     const purgeSectionEntry = useTrashStore(s => s.purge);
     const purgeAllSections = useTrashStore(s => s.purgeAll);
@@ -32,6 +33,7 @@ export function useTrashActions(totalCount: number): TrashActions {
     const restoreNoticeEntry = useNoticesStore(s => s.restore);
     const purgeNoticeEntry = useNoticesStore(s => s.purge);
     const purgeAllNotices = useNoticesStore(s => s.purgeAll);
+    const purgeForSection = useNoticesStore(s => s.purgeForSection);
 
     const handleRestore = useCallback(
         (row: UnifiedTrashRow) => {
@@ -87,14 +89,18 @@ export function useTrashActions(totalCount: number): TrashActions {
                     text: '모두 삭제',
                     style: 'destructive',
                     onPress: () => {
-                        purgeAllSections();
-                        purgeAllNotices();
+                        if (sectionId) {
+                            purgeForSection(sectionId);
+                        } else {
+                            purgeAllSections();
+                            purgeAllNotices();
+                        }
                         haptic('warning');
                     },
                 },
             ],
         );
-    }, [totalCount, purgeAllSections, purgeAllNotices]);
+    }, [totalCount, sectionId, purgeAllSections, purgeAllNotices, purgeForSection]);
 
     return { handleRestore, handlePurge, handlePurgeAll };
 }
