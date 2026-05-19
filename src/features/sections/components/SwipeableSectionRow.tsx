@@ -95,29 +95,32 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
 
         return (
             <View style={styles.wrap}>
-                {/* 액션 버튼 배경 — 알림 토글(좌) + 삭제(우) */}
-                <View style={styles.actionsBg}>
-                    <Pressable
-                        onPress={callToggleNotify}
-                        style={[styles.actionBtn, styles.notifyBtn]}
-                    >
-                        <Ionicons
-                            name={notifyOn ? 'notifications-off' : 'notifications'}
-                            size={20}
-                            color="#fff"
-                        />
-                        <Text style={styles.actionLabel}>
-                            {notifyOn ? '알림끄기' : '알림켜기'}
-                        </Text>
-                    </Pressable>
+                {/* actionsClip 은 카드의 시각적 경계와 정확히 일치 — overflow:hidden 으로
+                    버튼 색상이 카드 모서리 밖으로 삐져나오지 않도록 클리핑 */}
+                <View style={styles.actionsClip}>
+                    <View style={styles.actionsBg}>
+                        <Pressable
+                            onPress={callToggleNotify}
+                            style={[styles.actionBtn, styles.notifyBtn]}
+                        >
+                            <Ionicons
+                                name={notifyOn ? 'notifications-off' : 'notifications'}
+                                size={20}
+                                color="rgba(255,255,255,0.85)"
+                            />
+                            <Text style={styles.actionLabel}>
+                                {notifyOn ? '알림끄기' : '알림켜기'}
+                            </Text>
+                        </Pressable>
 
-                    <Pressable
-                        onPress={callDelete}
-                        style={[styles.actionBtn, styles.deleteBtn]}
-                    >
-                        <Ionicons name="trash" size={20} color="#fff" />
-                        <Text style={styles.actionLabel}>삭제</Text>
-                    </Pressable>
+                        <Pressable
+                            onPress={callDelete}
+                            style={[styles.actionBtn, styles.deleteBtn]}
+                        >
+                            <Ionicons name="trash" size={20} color="rgba(255,255,255,0.85)" />
+                            <Text style={styles.actionLabel}>삭제</Text>
+                        </Pressable>
+                    </View>
                 </View>
 
                 <GestureDetector gesture={pan}>
@@ -130,15 +133,24 @@ export const SwipeableSectionRow = React.forwardRef<SwipeableSectionRowHandle, P
 
 const styles = StyleSheet.create({
     wrap: { position: 'relative' },
-    actionsBg: {
+    /* 카드의 시각 경계(outerWrapper marginVertical:6 + borderRadius:lg)와 정확히 일치.
+       overflow:hidden 으로 버튼 배경이 카드 둥근 모서리 밖으로 삐져나오지 않도록 한다. */
+    actionsClip: {
         position: 'absolute',
         top: 6,
-        right: 0,
         bottom: 6,
-        width: ACTION_WIDTH,
-        flexDirection: 'row',
+        left: 0,
+        right: 0,
         borderRadius: radius.lg,
         overflow: 'hidden',
+    },
+    actionsBg: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        right: 0,
+        width: ACTION_WIDTH,
+        flexDirection: 'row',
     },
     actionBtn: {
         width: BTN_W,
@@ -147,14 +159,14 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     notifyBtn: {
-        backgroundColor: colors.accentAlt,
+        backgroundColor: 'rgba(42, 96, 160, 0.88)',
     },
     deleteBtn: {
-        backgroundColor: colors.danger,
+        backgroundColor: 'rgba(148, 36, 58, 0.88)',
     },
     actionLabel: {
         ...typography.caption,
-        color: '#fff',
+        color: 'rgba(255,255,255,0.85)',
         fontWeight: '600',
         fontSize: 10,
     },
