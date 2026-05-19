@@ -256,7 +256,7 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgBase },
+    root: { flex: 1 },
     list: { padding: spacing.lg, paddingBottom: 140 },
 
     pinHeader: {

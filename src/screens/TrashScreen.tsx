@@ -77,7 +77,7 @@ function EmptyTrash() {
 }
 
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgBase },
+    root: { flex: 1 },
 
     topBar: {
         flexDirection: 'row',

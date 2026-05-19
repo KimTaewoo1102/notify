@@ -14,9 +14,9 @@ const make = (
 });
 
 export const shadows = {
-    sm: make(0.18, 6, 2, 2),
-    md: make(0.28, 14, 6, 6),
-    lg: make(0.4, 24, 12, 12),
+    sm: make(0.32, 10, 3, 4),
+    md: make(0.48, 20, 8, 10),
+    lg: make(0.60, 32, 16, 18),
 } as const;
 
 export type ShadowToken = keyof typeof shadows;

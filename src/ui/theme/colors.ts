@@ -1,18 +1,20 @@
 export const colors = {
-    bgTop: '#0A0A0B',
-    bgBase: '#0E0E10',
-    bgRaised: '#16161A',
-    bgRaisedAlt: '#1C1C22',
+    /** 헤더 / 바닥 — 그라디언트 최상단 색조에 맞춘 쿨톤 다크 */
+    bgTop: '#0A0D15',
+    bgBase: '#0E0E12',
+    /** 카드 기본 배경 — 쿨톤 틴트로 그라디언트와 자연스럽게 어울림 */
+    bgRaised: '#1C1C24',
+    bgRaisedAlt: '#22232C',
 
-    border: 'rgba(255,255,255,0.06)',
-    borderStrong: 'rgba(255,255,255,0.12)',
+    border: 'rgba(255,255,255,0.10)',
+    borderStrong: 'rgba(255,255,255,0.18)',
     /**
      * 카드 / 메뉴 / 다이얼로그 상단 가장자리 highlight.
      * 다크 모드에서는 검정 shadow 만으로는 depth 가 약하므로 "위에서 빛이 든" 느낌의
      * 1px 톱-에지 highlight 를 더해 이중 depth 를 만든다.
      */
-    edgeHighlight: 'rgba(255,255,255,0.10)',
-    edgeHighlightStrong: 'rgba(255,255,255,0.18)',
+    edgeHighlight: 'rgba(255,255,255,0.22)',
+    edgeHighlightStrong: 'rgba(255,255,255,0.32)',
 
     textPrimary: '#F5F5F7',
     textSecondary: 'rgba(245,245,247,0.66)',
