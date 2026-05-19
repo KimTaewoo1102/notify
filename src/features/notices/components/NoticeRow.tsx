@@ -2,8 +2,10 @@ import React, { useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { BlurView } from 'expo-blur';
+
 import { PressableScale } from '../../../ui/primitives/PressableScale';
-import { colors, radius, spacing, typography } from '../../../ui/theme';
+import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
 import { CATEGORY_LABEL } from '../../../constants/categories';
 import {
     LONG_PRESS_DELAY_MS,
@@ -59,7 +61,7 @@ export function NoticeRow({
     };
 
     return (
-        <View ref={ref} collapsable={false}>
+        <View ref={ref} collapsable={false} style={[styles.shadowShell, shadows.sm]}>
             <PressableScale
                 onPress={onPress}
                 onLongPress={handleLongPress}
@@ -67,17 +69,21 @@ export function NoticeRow({
                 scaleTo={0.985}
                 style={[
                     styles.card,
-                    isNew && !selectionMode && !pinned && styles.cardNew,
-                    pinned && !selectionMode && {
-                        borderColor: PIN_COLOR + '66',
-                        backgroundColor: PIN_COLOR + '0E',
-                    },
-                    selectionMode && isSelected && {
-                        borderColor: accent,
-                        backgroundColor: accent + '14',
-                    },
+                    isNew && !selectionMode && !pinned && styles.cardNewBorder,
+                    pinned && !selectionMode && { borderColor: PIN_COLOR + '66' },
+                    selectionMode && isSelected && { borderColor: accent },
                 ]}
             >
+                <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFill} />
+                <View
+                    style={[
+                        StyleSheet.absoluteFill,
+                        styles.glassOverlay,
+                        isNew && !selectionMode && !pinned && styles.glassNew,
+                        pinned && !selectionMode && styles.glassPinned,
+                        selectionMode && isSelected && { backgroundColor: accent + '18' },
+                    ]}
+                />
                 {selectionMode && (
                     <View
                         style={[
@@ -174,19 +180,30 @@ export function NoticeRow({
 }
 
 const styles = StyleSheet.create({
+    shadowShell: {
+        borderRadius: radius.lg,
+    },
     card: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: spacing.sm,
-        backgroundColor: colors.bgRaised,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
         padding: spacing.md,
+        overflow: 'hidden',
     },
-    cardNew: {
-        backgroundColor: 'rgba(255,255,255,0.06)',
+    cardNewBorder: {
         borderColor: 'rgba(255,255,255,0.12)',
+    },
+    glassOverlay: {
+        backgroundColor: 'rgba(18, 18, 30, 0.60)',
+    },
+    glassNew: {
+        backgroundColor: 'rgba(26, 26, 40, 0.55)',
+    },
+    glassPinned: {
+        backgroundColor: PIN_COLOR + '14',
     },
     bodyWrap: { flex: 1, gap: spacing.xs },
     checkbox: {

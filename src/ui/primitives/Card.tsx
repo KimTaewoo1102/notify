@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { colors, radius, shadows, type ShadowToken } from '../theme';
@@ -26,30 +27,38 @@ export function Card({
     children,
 }: CardProps) {
     return (
-        <View style={[styles.card, shadows[shadow], style]}>
-            {showAccentLine && accent ? (
-                <LinearGradient
-                    colors={['transparent', accent + 'CC', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.accentLine}
-                    pointerEvents="none"
-                />
-            ) : null}
-            {children}
+        <View style={[styles.shadowShell, shadows[shadow], style]}>
+            <View style={styles.clip}>
+                <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={[StyleSheet.absoluteFill, styles.glassOverlay]} />
+                {showAccentLine && accent ? (
+                    <LinearGradient
+                        colors={['transparent', accent + 'CC', 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.accentLine}
+                        pointerEvents="none"
+                    />
+                ) : null}
+                {children}
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    card: {
-        backgroundColor: colors.bgRaised,
+    shadowShell: {
+        borderRadius: radius.lg,
+    },
+    clip: {
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
-        // 상단 가장자리 highlight — 이중 depth (shadow + edge)
         borderTopColor: colors.edgeHighlight,
         overflow: 'hidden',
+    },
+    glassOverlay: {
+        backgroundColor: 'rgba(18, 18, 30, 0.60)',
     },
     accentLine: {
         position: 'absolute',

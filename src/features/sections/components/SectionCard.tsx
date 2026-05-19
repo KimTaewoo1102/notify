@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -94,26 +95,27 @@ export function SectionCard({
 
     return (
         <Animated.View style={[styles.outerWrapper, wrapperStyle]}>
-            {/* 통합 카드 셸 — 카드 헤더와 미리보기를 하나의 둥근 덩어리로 감싼다 */}
-            <View
-                style={[
-                    styles.unifiedShell,
-                    shadows[shadowSize],
-                    isSystem && {
-                        backgroundColor: colors.bgRaisedAlt,
-                    },
-                ]}
-            >
-                {/* 상단 accent 그라데이션 라인 */}
-                {showAccentLine ? (
-                    <LinearGradient
-                        colors={['transparent', effectiveAccent + 'CC', 'transparent']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.accentLine}
-                        pointerEvents="none"
+            {/* 통합 카드 셸 — shadow 와 clip 분리 (iOS shadow + overflow:hidden 호환) */}
+            <View style={[styles.shadowShell, shadows[shadowSize]]}>
+                <View style={styles.clip}>
+                    <BlurView intensity={52} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View
+                        style={[
+                            StyleSheet.absoluteFill,
+                            styles.glassOverlay,
+                            isSystem && styles.glassOverlaySystem,
+                        ]}
                     />
-                ) : null}
+                    {/* 상단 accent 그라데이션 라인 */}
+                    {showAccentLine ? (
+                        <LinearGradient
+                            colors={['transparent', effectiveAccent + 'CC', 'transparent']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.accentLine}
+                            pointerEvents="none"
+                        />
+                    ) : null}
 
                 <PressableScale
                     onPress={onPress}
@@ -236,6 +238,7 @@ export function SectionCard({
                         </>
                     )}
                 </PressableScale>
+                </View>
             </View>
 
             <SectionCardMenu
@@ -250,15 +253,21 @@ export function SectionCard({
 
 const styles = StyleSheet.create({
     outerWrapper: { marginVertical: 6 },
-    /* 카드 헤더 + 미리보기를 하나의 시각 단위로 묶는 외곽 셸 */
-    unifiedShell: {
-        backgroundColor: colors.bgRaised,
+    shadowShell: {
+        borderRadius: radius.lg,
+    },
+    clip: {
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
-        // 상단 가장자리 highlight — 이중 depth (shadow + edge)
         borderTopColor: colors.edgeHighlight,
         overflow: 'hidden',
+    },
+    glassOverlay: {
+        backgroundColor: 'rgba(18, 18, 30, 0.60)',
+    },
+    glassOverlaySystem: {
+        backgroundColor: 'rgba(14, 16, 28, 0.68)',
     },
     /* 상단 1.5px 그라데이션 accent 라인 */
     accentLine: {

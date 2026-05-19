@@ -7,6 +7,7 @@ import {
     Text,
     View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors, radius, shadows, spacing, typography } from '../ui/theme';
@@ -58,14 +59,16 @@ export default function HotNoticesScreen({ navigation }: Props) {
                     />
                 ) : (
                     notices.map((n, idx) => (
+                        <View key={n.id} style={styles.shadowShell}>
                         <Pressable
-                            key={n.id}
                             onPress={() => openUrl(n.sourceUrl)}
                             style={({ pressed }) => [
                                 styles.card,
                                 pressed && styles.cardPressed,
                             ]}
                         >
+                            <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={[StyleSheet.absoluteFill, styles.glassOverlay]} />
                             <View style={styles.rankBadge}>
                                 <Text
                                     style={[
@@ -115,6 +118,7 @@ export default function HotNoticesScreen({ navigation }: Props) {
                                 style={styles.chevron}
                             />
                         </Pressable>
+                        </View>
                     ))
                 )}
             </ScrollView>
@@ -149,17 +153,23 @@ const styles = StyleSheet.create({
         color: colors.textMuted,
     },
 
+    shadowShell: {
+        borderRadius: radius.lg,
+        ...shadows.sm,
+    },
     card: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.bgRaised,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.md,
         gap: spacing.sm,
-        ...shadows.sm,
+        overflow: 'hidden',
+    },
+    glassOverlay: {
+        backgroundColor: 'rgba(18, 18, 30, 0.60)',
     },
     cardPressed: { opacity: 0.7 },
 

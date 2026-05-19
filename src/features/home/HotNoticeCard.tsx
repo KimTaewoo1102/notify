@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors, radius, shadows, spacing, typography } from '../../ui/theme';
@@ -20,10 +21,13 @@ export function HotNoticeCard({ notice, onPress }: Props) {
     const viewCount = notice.viewCount ?? 0;
 
     return (
+        <View style={styles.shadowShell}>
         <Pressable
             onPress={onPress}
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}
         >
+            <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, styles.glassOverlay]} />
             <View style={styles.topRow}>
                 {/* Premium 톤 — 빨강 dot + 'Hot' 텍스트 (이전 강렬한 HOT 뱃지 대체) */}
                 <View style={styles.hotIndicator}>
@@ -51,21 +55,27 @@ export function HotNoticeCard({ notice, onPress }: Props) {
                 </View>
             </View>
         </Pressable>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    shadowShell: {
+        borderRadius: radius.lg,
+        marginBottom: spacing.md,
+        ...shadows.sm,
+    },
     card: {
-        backgroundColor: colors.bgRaised,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.borderStrong,
-        // 상단 가장자리 highlight — 이중 depth (shadow + edge)
         borderTopColor: colors.edgeHighlightStrong,
         padding: spacing.md,
-        marginBottom: spacing.md,
         gap: spacing.xs,
-        ...shadows.sm,
+        overflow: 'hidden',
+    },
+    glassOverlay: {
+        backgroundColor: 'rgba(18, 18, 30, 0.62)',
     },
     pressed: { opacity: 0.75 },
     topRow: {
