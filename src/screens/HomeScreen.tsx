@@ -14,7 +14,7 @@ import { colors, spacing } from '../ui/theme';
 import { HotNoticeCard } from '../features/home/HotNoticeCard';
 import { EmptyState } from '../features/home/EmptyState';
 import { useHomePrefetch } from '../features/home/hooks/useHomePrefetch';
-import { AppMenuSheet, type AppMenuSheetHandle } from '../features/home/sheets/AppMenuSheet';
+import { AppDropdownMenu, type MenuAnchor } from '../features/home/components/AppDropdownMenu';
 import { SectionCard } from '../features/sections/components/SectionCard';
 import { HomeSectionRow } from '../features/sections/components/HomeSectionRow';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
@@ -55,8 +55,26 @@ export default function HomeScreen({ navigation }: Props) {
     const noticeCache = useNoticeCacheStore(s => s.cache);
 
     const [renameTarget, setRenameTarget] = useState<Section | null>(null);
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
 
-    const appMenuRef = useRef<AppMenuSheetHandle>(null);
+    const menuBtnRef = useRef<View>(null);
+
+    const openMenu = useCallback(() => {
+        menuBtnRef.current?.measureInWindow((x, y, w, h) => {
+            setMenuAnchor({ x, y, width: w, height: h });
+            setMenuVisible(true);
+            haptic('light');
+        });
+    }, []);
+
+    const onAddSchool = useCallback(() => {
+        Alert.alert('학교 추가', '준비 중입니다.');
+    }, []);
+
+    const onChangeSchool = useCallback(() => {
+        Alert.alert('학교 변경', '준비 중입니다.');
+    }, []);
 
     const { hotNotice, refresh, isRefreshing } = useHomePrefetch(userSections);
     const swipe = useSwipeRowManager<SwipeableSectionRowHandle>();
@@ -106,16 +124,18 @@ export default function HomeScreen({ navigation }: Props) {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerLeft: () => (
-                <Pressable
-                    onPress={() => appMenuRef.current?.present()}
-                    hitSlop={12}
-                    style={({ pressed }) => [
-                        headerBtnStyles.btn,
-                        pressed && headerBtnStyles.pressed,
-                    ]}
-                >
-                    <Ionicons name="apps-outline" size={22} color={colors.textPrimary} />
-                </Pressable>
+                <View ref={menuBtnRef} collapsable={false}>
+                    <Pressable
+                        onPress={openMenu}
+                        hitSlop={12}
+                        style={({ pressed }) => [
+                            headerBtnStyles.btn,
+                            pressed && headerBtnStyles.pressed,
+                        ]}
+                    >
+                        <Ionicons name="apps-outline" size={22} color={colors.textPrimary} />
+                    </Pressable>
+                </View>
             ),
             headerRight: () => (
                 <Pressable
@@ -130,7 +150,7 @@ export default function HomeScreen({ navigation }: Props) {
                 </Pressable>
             ),
         });
-    }, [navigation]);
+    }, [navigation, openMenu]);
 
     const onPressSection = useCallback(
         (s: Section) => {
@@ -169,6 +189,13 @@ export default function HomeScreen({ navigation }: Props) {
                     contentContainerStyle={styles.list}
                     ListHeaderComponent={renderPinHeader}
                     ListFooterComponent={<EmptyState onAdd={openAdd} />}
+                />
+                <AppDropdownMenu
+                    visible={menuVisible}
+                    anchor={menuAnchor}
+                    onClose={() => setMenuVisible(false)}
+                    onAddSchool={onAddSchool}
+                    onChangeSchool={onChangeSchool}
                 />
             </View>
         );
@@ -217,9 +244,12 @@ export default function HomeScreen({ navigation }: Props) {
                 onSubmit={handleRename}
             />
 
-            <AppMenuSheet
-                ref={appMenuRef}
-                onTrash={() => navigation.navigate('Trash')}
+            <AppDropdownMenu
+                visible={menuVisible}
+                anchor={menuAnchor}
+                onClose={() => setMenuVisible(false)}
+                onAddSchool={onAddSchool}
+                onChangeSchool={onChangeSchool}
             />
         </View>
     );

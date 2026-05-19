@@ -142,7 +142,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     }, [selectionMode, notices.length, exitSelection]);
 
     useLayoutEffect(() => {
-        const baseTitle = isSystemPin ? '고정' : section?.title ?? '';
+        const baseTitle = isSystemPin ? '스크랩' : section?.title ?? '';
         navigation.setOptions({
             // SelectionActionBar slide-up 과 같은 ease curve 로 헤더도 cross-fade.
             // 기존 즉시 변경(useLayoutEffect 의 title) 보다 시각적 연결성 강함.
@@ -241,8 +241,8 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
         return [
             {
                 key: 'pin',
-                label: isPinned ? '고정 해제' : '고정',
-                icon: isPinned ? 'pin' : 'pin-outline',
+                label: isPinned ? '스크랩 해제' : '스크랩',
+                icon: isPinned ? 'star' : 'star-outline',
                 iconColor: isPinned ? colors.warning : colors.textSecondary,
                 onPress: () => {
                     if (isPinned) unpinNotice(notice.id);
@@ -345,8 +345,8 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 {isSystemPin && (
                     <Card accent={accent} shadow="md" style={styles.summary}>
                         <View style={styles.summaryHead}>
-                            <Ionicons name="pin" size={16} color={accent} />
-                            <Text style={styles.summaryTitle}>고정한 공지</Text>
+                            <Ionicons name="star" size={16} color={accent} />
+                            <Text style={styles.summaryTitle}>스크랩한 공지</Text>
                         </View>
                         <Text style={styles.summaryMeta}>
                             {`${pinnedNoticesForSystem.length}개 공지 · 길게 눌러 해제`}
@@ -406,9 +406,9 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 {/* Notices */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>
-                            {isSystemPin ? '고정 공지' : '관련 공지'}
-                        </Text>
+                        {!isSystemPin && (
+                            <Text style={styles.sectionTitle}>관련 공지</Text>
+                        )}
                         {!isSystemPin && (
                             <PressableScale
                                 onPress={fetchNotices}
@@ -432,12 +432,12 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                         notices.length === 0 ? (
                             <View style={styles.noKeywords}>
                                 <Ionicons
-                                    name="pin-outline"
+                                    name="star-outline"
                                     size={24}
                                     color={colors.textMuted}
                                 />
                                 <Text style={styles.noKeywordsText}>
-                                    공지를 길게 눌러 고정하면 여기에 모입니다.
+                                    공지를 길게 눌러 스크랩하면 여기에 모입니다.
                                 </Text>
                             </View>
                         ) : (

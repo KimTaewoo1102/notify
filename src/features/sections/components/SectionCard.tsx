@@ -137,8 +137,8 @@ export function SectionCard({
                                 <View style={styles.titleRow}>
                                     {!isSystem && section.pinned && (
                                         <Ionicons
-                                            name="pin"
-                                            size={13}
+                                            name="star"
+                                            size={12}
                                             color={effectiveAccent}
                                             style={styles.pinIcon}
                                         />
@@ -166,12 +166,12 @@ export function SectionCard({
                                     {isSystem ? (
                                         pinnedCount && pinnedCount > 0 ? (
                                             <>
-                                                고정 {pinnedCount}개
+                                                스크랩 {pinnedCount}개
                                                 <Text style={styles.metaDim}> · </Text>
-                                                길게 눌러 공지 고정
+                                                길게 눌러 공지 스크랩
                                             </>
                                         ) : (
-                                            '공지를 길게 눌러 고정해 보세요'
+                                            '공지를 길게 눌러 스크랩해 보세요'
                                         )
                                     ) : section.keywords.length === 0 ? (
                                         <Text style={styles.metaDim}>키워드 없음</Text>
@@ -227,15 +227,15 @@ export function SectionCard({
                             </View>
                         </View>
                     </View>
-                </PressableScale>
 
-                {/* 미리보기 슬롯 — 통합 셸 내부에서 구분선 아래 렌더 */}
-                {previewSlot && (
-                    <>
-                        <View style={styles.internalDivider} />
-                        {previewSlot}
-                    </>
-                )}
+                    {/* 미리보기 슬롯 — PressableScale 안에 포함시켜 터치 영역 통합 */}
+                    {previewSlot && (
+                        <>
+                            <View style={styles.internalDivider} />
+                            {previewSlot}
+                        </>
+                    )}
+                </PressableScale>
             </View>
 
             <SectionCardMenu

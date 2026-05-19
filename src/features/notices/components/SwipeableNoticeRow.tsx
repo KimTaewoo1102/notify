@@ -151,7 +151,6 @@ export const SwipeableNoticeRow = React.forwardRef<SwipeableNoticeRowHandle, Pro
                     style={{
                         transform: [{ translateX }],
                         zIndex: 1,
-                        backgroundColor: colors.bgRaised,
                     }}
                     {...panResponder.panHandlers}
                 >

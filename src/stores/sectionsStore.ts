@@ -17,7 +17,7 @@ function makePinSystemSection(): Section {
     return {
         id: SYSTEM_PIN_SECTION_ID,
         kind: 'system',
-        title: '고정',
+        title: '스크랩',
         source: '',
         universityId: 'uos',
         accentColor: '#FFC857', // 따뜻한 옐로우 — 시각적으로 user 섹션과 분리
