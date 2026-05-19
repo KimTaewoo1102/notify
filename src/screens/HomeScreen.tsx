@@ -3,6 +3,7 @@ import {
     Alert,
     FlatList,
     Pressable,
+    RefreshControl,
     StyleSheet,
     View,
 } from 'react-native';
@@ -66,7 +67,7 @@ export default function HomeScreen({ navigation }: Props) {
 
     const appMenuRef = useRef<AppMenuSheetHandle>(null);
 
-    const hotNotice = useHomePrefetch(userSections);
+    const { hotNotice, refresh, isRefreshing } = useHomePrefetch(userSections);
     const swipe = useSwipeRowManager<SwipeableSectionRowHandle>();
     const displaySections = useSectionSort(userSections, editMode, noticeCache, deletedIds);
 
@@ -274,6 +275,14 @@ export default function HomeScreen({ navigation }: Props) {
                     ListHeaderComponent={renderPinHeader}
                     ListFooterComponent={renderAddSlot}
                     onScrollBeginDrag={swipe.closeOpenRow}
+                    refreshControl={
+                        // 편집 모드에서는 P2R 미제공 (드래그-리오더와 혼동 방지).
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={refresh}
+                            tintColor={colors.accent}
+                        />
+                    }
                     renderItem={({ item }) => (
                         <HomeSectionRow
                             section={item}

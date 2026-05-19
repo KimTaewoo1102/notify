@@ -12,6 +12,7 @@ import {
 } from './SwipeableSectionRow';
 import { SectionCard } from './SectionCard';
 import { UnreadPreview } from './UnreadPreview';
+import { UnreadPreviewSkeleton } from './UnreadPreviewSkeleton';
 import type { SwipeRowManager } from '../../notices/hooks/useSwipeRowManager';
 
 interface Props {
@@ -48,6 +49,10 @@ export function HomeSectionRow({
     const totalNoticeCount = useSectionsStore(s => s.noticeCountCache[section.id]);
     const deletedIds = useDeletedNoticeIdSet();
 
+    // cache === undefined: prefetch 아직 실행 전 (skeleton 노출 조건)
+    // cache === []      : 응답 받음, 결과 없음 (skeleton 미노출, preview 도 미노출)
+    const isLoading = cache === undefined && section.keywords.length > 0;
+
     const { unread, previews, total } = useMemo(() => {
         const allVisible = (cache ?? []).filter(n => !deletedIds.has(n.id));
         const lv = section.lastVisitedAt;
@@ -80,7 +85,9 @@ export function HomeSectionRow({
                 onRename={onRename}
                 onDelete={onDelete}
                 previewSlot={
-                    previews.length > 0 ? (
+                    isLoading ? (
+                        <UnreadPreviewSkeleton accent={colors.accent} />
+                    ) : previews.length > 0 ? (
                         <UnreadPreview
                             notices={previews}
                             totalCount={total}

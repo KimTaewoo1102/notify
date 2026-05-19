@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useNoticeCacheStore } from '../../../stores/noticeCacheStore';
 import { useSectionsStore } from '../../../stores/sectionsStore';
 import { uosAdapter } from '../../../services/universities/uos';
 import type { Notice, Section } from '../../../types/domain';
+
+interface Result {
+    hotNotice: Notice | null;
+    /** pull-to-refresh / 수동 호출 시 prefetch 를 다시 실행. */
+    refresh: () => void;
+    /** RefreshControl 의 `refreshing` 에 그대로 바인딩. */
+    isRefreshing: boolean;
+}
 
 /**
  * 홈 마운트 시 데이터 워밍업:
@@ -12,22 +20,29 @@ import type { Notice, Section } from '../../../types/domain';
  *
  * 의도(intent):
  *  - section list re-order 만으로 재실행되지 않도록 deps 는 id 배열의 join 으로 캡쳐.
- *    (userSections 배열 자체는 sort 마다 새 reference 라 deps 로 직접 쓰면 무한 fetch.)
  *  - 개별 섹션 prefetch 실패는 조용히 무시 — UX 영향 최소화.
  *  - cancelled 토큰으로 화면 언마운트 / 섹션 변경 시 stale write 차단.
+ *
+ * 수동 refresh:
+ *  - `refresh()` 호출 → refreshTick 증가 → 두 prefetch useEffect 가 모두 재실행.
+ *  - `isRefreshing` 은 section prefetch 완료 시 false (대표값 — hot 은 보통 더 빠름).
  */
-export function useHomePrefetch(userSections: Section[]): Notice | null {
+export function useHomePrefetch(userSections: Section[]): Result {
     const setNoticeCache = useNoticeCacheStore(s => s.setCache);
     const updateNoticeCount = useSectionsStore(s => s.updateNoticeCount);
 
     const [hotNotice, setHotNotice] = useState<Notice | null>(null);
+    const [refreshTick, setRefreshTick] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // HOT 공지 fetch — refreshTick 증가 시 재실행
     useEffect(() => {
         uosAdapter.fetchHot().then(list => {
             if (list.length > 0) setHotNotice(list[0]);
         });
-    }, []);
+    }, [refreshTick]);
 
+    // 섹션 prefetch — id 시퀀스 또는 refreshTick 변화 시 재실행
     useEffect(() => {
         let cancelled = false;
         async function prefetchAll() {
@@ -46,14 +61,25 @@ export function useHomePrefetch(userSections: Section[]): Notice | null {
                     // 개별 섹션 실패는 조용히 무시
                 }
             }
+            if (!cancelled) setIsRefreshing(false);
         }
         prefetchAll();
         return () => {
             cancelled = true;
         };
-        // userSections 배열 자체가 아닌 id 시퀀스로 deps 캡쳐 — 정렬 변화에는 재실행하지 않음.
+        // userSections 배열 자체가 아닌 id 시퀀스 + refreshTick 으로 deps 캡쳐.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userSections.map(s => s.id).join(','), setNoticeCache, updateNoticeCount]);
+    }, [
+        userSections.map(s => s.id).join(','),
+        refreshTick,
+        setNoticeCache,
+        updateNoticeCount,
+    ]);
 
-    return hotNotice;
+    const refresh = useCallback(() => {
+        setIsRefreshing(true);
+        setRefreshTick(t => t + 1);
+    }, []);
+
+    return { hotNotice, refresh, isRefreshing };
 }

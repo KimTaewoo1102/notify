@@ -35,6 +35,7 @@ import {
     type NoticeMenuItem,
 } from '../features/notices/components/NoticeContextMenu';
 import { NoticeRow } from '../features/notices/components/NoticeRow';
+import { SelectionHeaderTitle } from '../features/notices/components/SelectionHeaderTitle';
 import { useSwipeRowManager } from '../features/notices/hooks/useSwipeRowManager';
 import { useNewNoticeDetection } from '../features/notices/hooks/useNewNoticeDetection';
 import { useNoticeSelection } from '../features/notices/hooks/useNoticeSelection';
@@ -141,12 +142,17 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
     }, [selectionMode, notices.length, exitSelection]);
 
     useLayoutEffect(() => {
+        const baseTitle = isSystemPin ? '고정' : section?.title ?? '';
         navigation.setOptions({
-            title: selectionMode
-                ? `${selected.size}개 선택`
-                : isSystemPin
-                ? '고정'
-                : section?.title ?? '',
+            // SelectionActionBar slide-up 과 같은 ease curve 로 헤더도 cross-fade.
+            // 기존 즉시 변경(useLayoutEffect 의 title) 보다 시각적 연결성 강함.
+            headerTitle: () => (
+                <SelectionHeaderTitle
+                    selectionMode={selectionMode}
+                    selectedCount={selected.size}
+                    baseTitle={baseTitle}
+                />
+            ),
             headerRight: () =>
                 selectionMode || isSystemPin ? null : (
                     <SectionTrashButton
