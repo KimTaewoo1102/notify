@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PressableScale } from '../../../ui/primitives/PressableScale';
-import { haptic } from '../../../ui/feedback/haptics';
 import { colors, radius, shadows, spacing, typography } from '../../../ui/theme';
 import { useSectionCardAnimation } from '../hooks/useSectionCardAnimation';
 import { useSectionKebabMenu } from '../hooks/useSectionKebabMenu';
@@ -18,10 +17,7 @@ const USER_ACCENT = colors.accent;
 
 interface Props {
     section: Section;
-    editMode?: boolean;
-    isDragActive?: boolean;
     onPress?: () => void;
-    onLongPress?: () => void;
     onDelete?: () => void;
     onToggleNotify?: () => void;
     onEditKeywords?: () => void;
@@ -38,10 +34,7 @@ interface Props {
 
 export function SectionCard({
     section,
-    editMode,
-    isDragActive,
     onPress,
-    onLongPress,
     onDelete,
     onToggleNotify,
     onEditKeywords,
@@ -55,7 +48,6 @@ export function SectionCard({
     const effectiveAccent = isSystem ? section.accentColor : USER_ACCENT;
 
     const wrapperStyle = useSectionCardAnimation({
-        isDragActive,
         notifyOn: section.notifyOn,
         isSystem,
     });
@@ -65,8 +57,7 @@ export function SectionCard({
         { onToggleNotify, onEditKeywords, onRename, onDelete },
     );
 
-    const showKebab = !isSystem && !editMode;
-    const showDelete = !isSystem && editMode;
+    const showKebab = !isSystem;
     const showAccentLine = false;
     const shadowSize = isSystem ? 'lg' : 'md';
 
@@ -98,7 +89,7 @@ export function SectionCard({
     };
 
     /* ─── 우측 unread 뱃지 ──────────────────────────────── */
-    const showUnreadBadge = !isSystem && !editMode && unreadCount > 0;
+    const showUnreadBadge = !isSystem && unreadCount > 0;
     const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
 
     return (
@@ -126,15 +117,6 @@ export function SectionCard({
 
                 <PressableScale
                     onPress={onPress}
-                    onLongPress={
-                        isSystem
-                            ? undefined
-                            : () => {
-                                  haptic('medium');
-                                  onLongPress?.();
-                              }
-                    }
-                    disabled={editMode && !isSystem}
                     scaleTo={isSystem ? 0.99 : 0.98}
                 >
                     <View style={styles.cardContent}>
@@ -206,56 +188,43 @@ export function SectionCard({
                                 </Text>
                             </View>
 
-                            {showDelete ? (
-                                <Pressable
-                                    onPress={onDelete}
-                                    hitSlop={14}
-                                    style={({ pressed }) => [
-                                        styles.deleteBtn,
-                                        pressed && { opacity: 0.6 },
-                                    ]}
-                                >
-                                    <Ionicons name="remove" size={18} color="#fff" />
-                                </Pressable>
-                            ) : (
-                                <View style={styles.trailing}>
-                                    {showUnreadBadge && (
-                                        <View
-                                            style={[
-                                                styles.unreadBadge,
-                                                { backgroundColor: colors.danger },
-                                            ]}
-                                        >
-                                            <Text style={styles.unreadBadgeText}>
-                                                {badgeLabel}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {showKebab ? (
-                                        <Pressable
-                                            ref={kebabRef}
-                                            onPress={openMenu}
-                                            hitSlop={12}
-                                            style={({ pressed }) => [
-                                                styles.kebabBtn,
-                                                pressed && { opacity: 0.6 },
-                                            ]}
-                                        >
-                                            <Ionicons
-                                                name="ellipsis-vertical"
-                                                size={16}
-                                                color={colors.textSecondary}
-                                            />
-                                        </Pressable>
-                                    ) : (
+                            <View style={styles.trailing}>
+                                {showUnreadBadge && (
+                                    <View
+                                        style={[
+                                            styles.unreadBadge,
+                                            { backgroundColor: colors.danger },
+                                        ]}
+                                    >
+                                        <Text style={styles.unreadBadgeText}>
+                                            {badgeLabel}
+                                        </Text>
+                                    </View>
+                                )}
+                                {showKebab ? (
+                                    <Pressable
+                                        ref={kebabRef}
+                                        onPress={openMenu}
+                                        hitSlop={12}
+                                        style={({ pressed }) => [
+                                            styles.kebabBtn,
+                                            pressed && { opacity: 0.6 },
+                                        ]}
+                                    >
                                         <Ionicons
-                                            name="chevron-forward"
-                                            size={18}
-                                            color={colors.textMuted}
+                                            name="ellipsis-vertical"
+                                            size={16}
+                                            color={colors.textSecondary}
                                         />
-                                    )}
-                                </View>
-                            )}
+                                    </Pressable>
+                                ) : (
+                                    <Ionicons
+                                        name="chevron-forward"
+                                        size={18}
+                                        color={colors.textMuted}
+                                    />
+                                )}
+                            </View>
                         </View>
                     </View>
                 </PressableScale>
@@ -360,14 +329,6 @@ const styles = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    deleteBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: colors.danger,
         alignItems: 'center',
         justifyContent: 'center',
     },

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -7,20 +7,14 @@ import {
     StyleSheet,
     View,
 } from 'react-native';
-import DraggableFlatList, {
-    ScaleDecorator,
-    type RenderItemParams,
-} from 'react-native-draggable-flatlist';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { haptic } from '../ui/feedback/haptics';
 import { colors, spacing } from '../ui/theme';
-import { EditDoneButton } from '../features/home/EditDoneButton';
 import { HotNoticeCard } from '../features/home/HotNoticeCard';
 import { EmptyState } from '../features/home/EmptyState';
 import { useHomePrefetch } from '../features/home/hooks/useHomePrefetch';
 import { AppMenuSheet, type AppMenuSheetHandle } from '../features/home/sheets/AppMenuSheet';
-import { JiggleWrapper } from '../features/sections/components/JiggleWrapper';
 import { SectionCard } from '../features/sections/components/SectionCard';
 import { HomeSectionRow } from '../features/sections/components/HomeSectionRow';
 import { AddSectionSlot } from '../features/sections/components/AddSectionSlot';
@@ -49,12 +43,9 @@ export default function HomeScreen({ navigation }: Props) {
     const userSections = useOrderedUserSections();
     const pinSection = usePinSystemSection();
     const pinnedCount = usePinnedNoticeCount();
-    const editMode = useUIStore(s => s.editMode);
-    const setEditMode = useUIStore(s => s.setEditMode);
     const openAdd = useUIStore(s => s.openAddSection);
 
     const sectionsMap = useSectionsStore(s => s.sections);
-    const reorder = useSectionsStore(s => s.reorderSections);
     const removeSection = useSectionsStore(s => s.removeSection);
     const renameSection = useSectionsStore(s => s.renameSection);
     const toggleNotify = useSectionsStore(s => s.toggleNotify);
@@ -69,12 +60,12 @@ export default function HomeScreen({ navigation }: Props) {
 
     const { hotNotice, refresh, isRefreshing } = useHomePrefetch(userSections);
     const swipe = useSwipeRowManager<SwipeableSectionRowHandle>();
-    const displaySections = useSectionSort(userSections, editMode, noticeCache, deletedIds);
+    const displaySections = useSectionSort(userSections, noticeCache, deletedIds);
 
     const deleteSection = useCallback(
         (id: string) => {
             const sec = sectionsMap[id];
-            if (!sec || sec.kind === 'system') return; // 시스템 섹션 보호
+            if (!sec || sec.kind === 'system') return;
             pushToTrash(sec);
             removeSection(id);
         },
@@ -112,11 +103,6 @@ export default function HomeScreen({ navigation }: Props) {
         [renameTarget, renameSection],
     );
 
-    // user 섹션이 0이 되면 자동으로 편집 모드 해제.
-    useEffect(() => {
-        if (editMode && userSections.length === 0) setEditMode(false);
-    }, [editMode, userSections.length, setEditMode]);
-
     useLayoutEffect(() => {
         navigation.setOptions({
             headerLeft: () => (
@@ -132,50 +118,27 @@ export default function HomeScreen({ navigation }: Props) {
                 </Pressable>
             ),
             headerRight: () => (
-                <View style={headerBtnStyles.rightRow}>
-                    <Pressable
-                        onPress={() => navigation.navigate('Trash')}
-                        hitSlop={12}
-                        style={({ pressed }) => [
-                            headerBtnStyles.btn,
-                            pressed && headerBtnStyles.pressed,
-                        ]}
-                    >
-                        <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
-                    </Pressable>
-                    {userSections.length > 0 && (
-                        <EditDoneButton
-                            editMode={editMode}
-                            onToggle={() => setEditMode(!editMode)}
-                        />
-                    )}
-                </View>
+                <Pressable
+                    onPress={() => navigation.navigate('Trash')}
+                    hitSlop={12}
+                    style={({ pressed }) => [
+                        headerBtnStyles.btn,
+                        pressed && headerBtnStyles.pressed,
+                    ]}
+                >
+                    <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                </Pressable>
             ),
         });
-    }, [navigation, editMode, userSections.length, setEditMode]);
+    }, [navigation]);
 
     const onPressSection = useCallback(
         (s: Section) => {
-            // 편집 모드에서 카드 본문 탭 = "편집 종료" (iOS Springboard 패턴).
-            // 카드의 '−' 삭제 버튼은 자식 Pressable 이라 이 핸들러로 새지 않음.
-            if (editMode) {
-                setEditMode(false);
-                return;
-            }
             navigation.navigate('SectionDetail', { sectionId: s.id });
         },
-        [editMode, navigation, setEditMode],
+        [navigation],
     );
 
-    const onLongPressSection = useCallback(() => {
-        if (!editMode) {
-            haptic('medium');
-            setEditMode(true);
-        }
-    }, [editMode, setEditMode]);
-
-    // 시스템 섹션은 항상 최상단에 자리하며, 편집 모드와 무관하게 jiggle/drag/'-' 가
-    // 절대 노출되지 않도록 ListHeaderComponent 슬롯에 분리해 렌더한다.
     const renderPinHeader = () => (
         <>
             {hotNotice && (
@@ -217,86 +180,35 @@ export default function HomeScreen({ navigation }: Props) {
         <View
             style={styles.root}
             onTouchStart={() => {
-                // 빈 공간 또는 카드 외부 탭 시 열린 row 닫기
                 if (swipe.isAnyOpen()) swipe.closeOpenRow();
             }}
         >
-            {editMode ? (
-                <DraggableFlatList<Section>
-                    data={userSections}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.list}
-                    activationDistance={6}
-                    ListHeaderComponent={renderPinHeader}
-                    ListFooterComponent={renderAddSlot}
-                    onDragBegin={() => haptic('light')}
-                    onDragEnd={({ data }) => {
-                        haptic('medium');
-                        reorder(data.map(d => d.id));
-                    }}
-                    renderItem={(params: RenderItemParams<Section>) => {
-                        const { item, drag, isActive, getIndex } = params;
-                        const idx = getIndex() ?? 0;
-                        return (
-                            <ScaleDecorator>
-                                <JiggleWrapper active={!isActive} index={idx}>
-                                    {/*
-                                     * 편집 모드 카드 wrapper:
-                                     *   - onLongPress(140ms) → drag 시작
-                                     *   - onPress (단순 탭) → 편집 모드 종료
-                                     *   카드 내부 '−' 삭제 버튼은 자식 Pressable 이라
-                                     *   이 onPress 로 새지 않음 (RN Pressable 중첩 규칙)
-                                     */}
-                                    <Pressable
-                                        onLongPress={drag}
-                                        delayLongPress={140}
-                                        onPress={() => setEditMode(false)}
-                                    >
-                                        <SectionCard
-                                            section={item}
-                                            editMode
-                                            isDragActive={isActive}
-                                            onDelete={() => {
-                                                haptic('warning');
-                                                deleteSection(item.id);
-                                            }}
-                                        />
-                                    </Pressable>
-                                </JiggleWrapper>
-                            </ScaleDecorator>
-                        );
-                    }}
-                />
-            ) : (
-                <FlatList
-                    data={displaySections}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.list}
-                    ListHeaderComponent={renderPinHeader}
-                    ListFooterComponent={renderAddSlot}
-                    onScrollBeginDrag={swipe.closeOpenRow}
-                    refreshControl={
-                        // 편집 모드에서는 P2R 미제공 (드래그-리오더와 혼동 방지).
-                        <RefreshControl
-                            refreshing={isRefreshing}
-                            onRefresh={refresh}
-                            tintColor={colors.accent}
-                        />
-                    }
-                    renderItem={({ item }) => (
-                        <HomeSectionRow
-                            section={item}
-                            swipe={swipe}
-                            onPress={() => onPressSection(item)}
-                            onLongPress={onLongPressSection}
-                            onDelete={() => confirmDelete(item)}
-                            onToggleNotify={() => toggleNotify(item.id)}
-                            onEditKeywords={() => openKeywordEdit(item.id)}
-                            onRename={() => setRenameTarget(item)}
-                        />
-                    )}
-                />
-            )}
+            <FlatList
+                data={displaySections}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.list}
+                ListHeaderComponent={renderPinHeader}
+                ListFooterComponent={renderAddSlot}
+                onScrollBeginDrag={swipe.closeOpenRow}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={refresh}
+                        tintColor={colors.accent}
+                    />
+                }
+                renderItem={({ item }) => (
+                    <HomeSectionRow
+                        section={item}
+                        swipe={swipe}
+                        onPress={() => onPressSection(item)}
+                        onDelete={() => confirmDelete(item)}
+                        onToggleNotify={() => toggleNotify(item.id)}
+                        onEditKeywords={() => openKeywordEdit(item.id)}
+                        onRename={() => setRenameTarget(item)}
+                    />
+                )}
+            />
 
             <RenameSectionModal
                 visible={!!renameTarget}
@@ -317,7 +229,6 @@ const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgBase },
     list: { padding: spacing.lg, paddingBottom: 140 },
 
-    // 시스템 섹션 — user 영역과 시각 분리. 아래에 얇은 디바이더.
     pinHeader: {
         marginBottom: spacing.sm,
         paddingBottom: spacing.sm,
@@ -327,13 +238,9 @@ const styles = StyleSheet.create({
 });
 
 const headerBtnStyles = StyleSheet.create({
-    rightRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
     btn: {
-        padding: spacing.xs,
+        width: 36,
+        height: 36,
         alignItems: 'center',
         justifyContent: 'center',
     },
