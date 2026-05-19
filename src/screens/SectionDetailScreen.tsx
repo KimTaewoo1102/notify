@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Linking,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -17,6 +16,7 @@ import { ActionPill } from '../ui/primitives/ActionPill';
 import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, spacing, typography } from '../ui/theme';
 import { shareNotice } from '../utils/share';
+import { openExternalUrl } from '../utils/openExternal';
 import { useSectionsStore } from '../stores/sectionsStore';
 import { useUIStore } from '../stores/uiStore';
 import {
@@ -182,8 +182,10 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 toggleSelected(n.id);
                 return;
             }
-            // 카드 본문 탭 → 외부 URL 열기 (chevron-forward 가 affordance)
-            Linking.openURL(n.sourceUrl).catch(() => {});
+            // 카드 본문 탭 → 인앱 브라우저로 외부 URL 열기 (chevron-forward 가 affordance).
+            // expo-web-browser 가 iOS SFSafariViewController / Android Custom Tabs 로
+            // 시트형 표시 — 앱 컨텍스트 유지 (Linking 처럼 Safari 로 새지 않음).
+            openExternalUrl(n.sourceUrl);
         },
         [selectionMode, toggleSelected, swipe],
     );

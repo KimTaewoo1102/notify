@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Linking,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -10,11 +9,11 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { haptic } from '../ui/feedback/haptics';
 import { colors, radius, shadows, spacing, typography } from '../ui/theme';
 import { uosAdapter } from '../services/universities/uos';
 import { timeAgo } from '../utils/time';
 import { formatViewCount } from '../utils/format';
+import { openExternalUrl } from '../utils/openExternal';
 import { CATEGORY_LABEL } from '../constants/categories';
 import type { Notice } from '../types/domain';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -33,9 +32,10 @@ export default function HotNoticesScreen({ navigation }: Props) {
         });
     }, [navigation]);
 
+    // 카드 탭 = 인앱 브라우저 (expo-web-browser, iOS SFSafariViewController /
+    // Android Custom Tabs). Premium 톤 — 탭 자체엔 햅틱 없음.
     const openUrl = (url: string) => {
-        haptic('light');
-        Linking.openURL(url);
+        openExternalUrl(url);
     };
 
     return (
