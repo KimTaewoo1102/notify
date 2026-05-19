@@ -227,15 +227,15 @@ export function SectionCard({
                             </View>
                         </View>
                     </View>
-                </PressableScale>
 
-                {/* 미리보기 슬롯 — 통합 셸 내부에서 구분선 아래 렌더 */}
-                {previewSlot && (
-                    <>
-                        <View style={styles.internalDivider} />
-                        {previewSlot}
-                    </>
-                )}
+                    {/* 미리보기 슬롯 — PressableScale 안에 포함시켜 터치 영역 통합 */}
+                    {previewSlot && (
+                        <>
+                            <View style={styles.internalDivider} />
+                            {previewSlot}
+                        </>
+                    )}
+                </PressableScale>
             </View>
 
             <SectionCardMenu
