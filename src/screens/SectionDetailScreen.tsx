@@ -157,7 +157,7 @@ export default function SectionDetailScreen({ navigation, route }: Props) {
                 selectionMode || isSystemPin ? null : (
                     <SectionTrashButton
                         count={deletedCount}
-                        onPress={() => navigation.navigate('Trash')}
+                        onPress={() => navigation.navigate('Trash', { sectionId })}
                     />
                 ),
         });

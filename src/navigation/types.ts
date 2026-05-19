@@ -5,7 +5,7 @@ export type RootStackParamList = {
     Home: undefined;
     SectionDetail: { sectionId: ID };
     HotNotices: undefined;
-    Trash: undefined;
+    Trash: { sectionId?: ID } | undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =
