@@ -19,7 +19,6 @@ interface Props {
     section: Section;
     swipe: SwipeRowManager<SwipeableSectionRowHandle>;
     onPress: () => void;
-    onLongPress: () => void;
     onDelete: () => void;
     onToggleNotify: () => void;
     onEditKeywords: () => void;
@@ -39,7 +38,6 @@ export function HomeSectionRow({
     section,
     swipe,
     onPress,
-    onLongPress,
     onDelete,
     onToggleNotify,
     onEditKeywords,
@@ -79,7 +77,6 @@ export function HomeSectionRow({
                 totalNoticeCount={totalNoticeCount}
                 unreadCount={unread}
                 onPress={onPress}
-                onLongPress={onLongPress}
                 onToggleNotify={onToggleNotify}
                 onEditKeywords={onEditKeywords}
                 onRename={onRename}

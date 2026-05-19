@@ -148,7 +148,11 @@ export const SwipeableNoticeRow = React.forwardRef<SwipeableNoticeRowHandle, Pro
 
                 {/* 공지 카드 (슬라이드되는 앞면) */}
                 <Animated.View
-                    style={{ transform: [{ translateX }], zIndex: 1 }}
+                    style={{
+                        transform: [{ translateX }],
+                        zIndex: 1,
+                        backgroundColor: colors.bgRaised,
+                    }}
                     {...panResponder.panHandlers}
                 >
                     {children}
