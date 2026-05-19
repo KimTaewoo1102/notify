@@ -78,14 +78,20 @@ export const SwipeableNoticeRow = React.forwardRef<SwipeableNoticeRowHandle, Pro
                  * 가로채기 위해 capture phase 에서 동일한 조건을 평가한다.
                  * 이게 없으면 부모 ScrollView 가 먼저 responder 가 되면서
                  * 좌측 스와이프가 '씹힘'.
+                 *
+                 * 표준 임계값 — SwipeableSectionRow (Gesture.Pan) 와 정합:
+                 *   * 좌향 12px 초과 시 활성화 (우향 / 우향 스와이프는 무시)
+                 *   * 수직 변위 10px 초과 시 즉시 fail → 부모 스크롤 우선
                  */
-                onMoveShouldSetPanResponderCapture: (_, g) =>
-                    Math.abs(g.dx) > 6 &&
-                    Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+                onMoveShouldSetPanResponderCapture: (_, g) => {
+                    if (Math.abs(g.dy) > 10) return false;
+                    return g.dx < -12;
+                },
                 // 보조 — bubble phase 에서도 동일 조건으로 한 번 더 시도
-                onMoveShouldSetPanResponder: (_, g) =>
-                    Math.abs(g.dx) > 6 &&
-                    Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+                onMoveShouldSetPanResponder: (_, g) => {
+                    if (Math.abs(g.dy) > 10) return false;
+                    return g.dx < -12;
+                },
                 onPanResponderTerminationRequest: () => false,
                 onPanResponderGrant: () => {
                     isFullSwiped.current = false;
