@@ -107,7 +107,7 @@ export function NoticeRow({
                         )}
                         {notice.isSourcePinned && (
                             <Ionicons
-                                name="pin"
+                                name="star"
                                 size={11}
                                 color={accent}
                                 style={styles.pinIcon}
@@ -119,7 +119,7 @@ export function NoticeRow({
                     <View style={styles.titleRow}>
                         {pinned && (
                             <Ionicons
-                                name="pin"
+                                name="star"
                                 size={13}
                                 color={PIN_COLOR}
                                 style={styles.userPinIcon}
